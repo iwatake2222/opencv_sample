@@ -1,0 +1,1 @@
+add_executable(projection_points_3d_to_2d main.cpp)
