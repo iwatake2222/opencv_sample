@@ -138,6 +138,55 @@ void MoveObject(float x, float y, float z, std::vector<cv::Point3f>& object_poin
     }
 }
 
+void ProjectWorld2Image(CameraParameter camera_parameter, const cv::Point3f& object_point, cv::Point2f& image_point)
+{
+    /* todo: the conversion result is diferent from cv::projectPoints when more than two angles changes */
+    /*** Projection ***/
+    /* s[u, v, 1] = A * [R t] * [M, 1]  */
+    cv::Mat A = camera_parameter.camera_matrix;
+    cv::Mat R_x = (cv::Mat_<float>(3, 3) <<
+        1, 0, 0,
+        0, std::cos(camera_parameter.pitch()), -std::sin(camera_parameter.pitch()),
+        0, std::sin(camera_parameter.pitch()), std::cos(camera_parameter.pitch()));
+    cv::Mat R_y = (cv::Mat_<float>(3, 3) <<
+        std::cos(camera_parameter.yaw()), 0, std::sin(camera_parameter.yaw()),
+        0, 1, 0,
+        -std::sin(camera_parameter.yaw()), 0, std::cos(camera_parameter.yaw()));
+    cv::Mat R_z = (cv::Mat_<float>(3, 3) <<
+        std::cos(camera_parameter.roll()), -std::sin(camera_parameter.roll()), 0,
+        std::sin(camera_parameter.roll()), std::cos(camera_parameter.roll()), 0,
+        0, 0, 1);
+    cv::Mat R = R_z * R_x * R_y;
+    cv::Mat Rt = (cv::Mat_<float>(3, 4) <<
+        R.at<float>(0), R.at<float>(1), R.at<float>(2), camera_parameter.x(),
+        R.at<float>(3), R.at<float>(4), R.at<float>(5), camera_parameter.y(),
+        R.at<float>(6), R.at<float>(7), R.at<float>(8), camera_parameter.z());
+
+    cv::Mat Mw = (cv::Mat_<float>(4, 1) << object_point.x, object_point.y, object_point.z, 1);
+
+    cv::Mat uv = A * Rt * Mw;
+
+    float u = uv.at<float>(0);
+    float v = uv.at<float>(1);
+    float s = uv.at<float>(2);
+
+    /*** Undistort ***/
+    float r = std::sqrtf(u * u + v * v);
+    float r2 = r * r;
+    float r4 = r2 * r2;
+    float k1 = camera_parameter.dist_coeff.at<float>(0);
+    float k2 = camera_parameter.dist_coeff.at<float>(1);
+    float p1 = camera_parameter.dist_coeff.at<float>(3);
+    float p2 = camera_parameter.dist_coeff.at<float>(4);
+    u = u + u * (k1 * r2 + k2 * r4 /*+ k3 * r6 */) + (2 * p1 * u * v) + p2 * (r2 + 2 * u * u);
+    v = v + v * (k1 * r2 + k2 * r4 /*+ k3 * r6 */) + (2 * p2 * u * v) + p1 * (r2 + 2 * v * v);
+    
+    image_point.x = u / s;
+    image_point.y = v / s;
+}
+
+
+
 void CreateMapping(cv::Size size, std::vector<cv::Point2f>& image_point_list, std::vector<cv::Point3f>& object_point_list)
 {
     /*** Select target area (possible road area) and calculate corresponding points in world coordinate ***/
@@ -219,17 +268,17 @@ static void loop_param()
         camera_parameter_topview.fy() = camera_parameter_real.fy();
 
         cvui::text("Camera Parameter (external)");
-        float temp_deg = Rad2Deg(camera_parameter_real.pitch());
+        float temp_deg = Rad2Deg(camera_parameter_topview.pitch());
         MAKE_GUI_SETTING_FLOAT(temp_deg, "Pitch", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera_parameter_real.pitch() = Deg2Rad(temp_deg);
+        camera_parameter_topview.pitch() = Deg2Rad(temp_deg);
 
-        temp_deg = Rad2Deg(camera_parameter_real.yaw());
+        temp_deg = Rad2Deg(camera_parameter_topview.yaw());
         MAKE_GUI_SETTING_FLOAT(temp_deg, "Yaw", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera_parameter_real.yaw() = Deg2Rad(temp_deg);
+        camera_parameter_topview.yaw() = Deg2Rad(temp_deg);
 
-        temp_deg = Rad2Deg(camera_parameter_real.roll());
+        temp_deg = Rad2Deg(camera_parameter_topview.roll());
         MAKE_GUI_SETTING_FLOAT(temp_deg, "Roll", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera_parameter_real.roll() = Deg2Rad(temp_deg);
+        camera_parameter_topview.roll() = Deg2Rad(temp_deg);
 
     }
     cvui::endColumn();
