@@ -51,8 +51,8 @@ static int32_t new_image_size_scale = 3;   /* this value should be adjusted acco
 static bool update_camera_parameter = true;
 
 /*** Function ***/
-static inline float Deg2Rad(float deg) { return static_cast<float>(deg * M_PI / 180.0f); }
-static inline float Rad2Deg(float rad) { return static_cast<float>(rad * 180.0f / M_PI); }
+static inline float Deg2Rad(float deg) { return static_cast<float>(deg * M_PI / 180.0); }
+static inline float Rad2Deg(float rad) { return static_cast<float>(rad * 180.0 / M_PI); }
 static void CreateUndistortMap(cv::Size undist_image_size, float f_undist, float xi, float u0_undist, float v0_undist, float f_dist, float u0_dist, float v0_dist, cv::Mat& mapx, cv::Mat& mapy);
 
 
@@ -84,7 +84,7 @@ static void loop_main(const cv::Mat& image_org)
     }
 }
 
-#define MAKE_GUI_SETTING_FLOAT(VAL, LABEL, STEP, FORMAT, RANGE) {\
+#define MAKE_GUI_SETTING_FLOAT(VAL, LABEL, STEP, FORMAT, RANGE0, RANGE1) {\
 cvui::beginColumn(-1, -1, 2);\
 double temp_double_current = static_cast<double>(VAL);\
 double temp_double_new = temp_double_current;\
@@ -92,7 +92,7 @@ float temp_float_current = VAL;\
 float temp_float_new = temp_float_current;\
 cvui::text(LABEL);\
 cvui::counter(&temp_double_new, STEP, FORMAT);\
-cvui::trackbar<float>(200, &temp_float_new, 0, RANGE);\
+cvui::trackbar<float>(200, &temp_float_new, RANGE0, RANGE1);\
 if (temp_double_new != temp_double_current) VAL = static_cast<float>(temp_double_new);\
 if (temp_float_new != temp_float_current) VAL = temp_float_new;\
 cvui::endColumn();\
@@ -110,11 +110,11 @@ static void loop_param()
             new_image_size_scale = 3;
         }
 
-        MAKE_GUI_SETTING_FLOAT(new_image_size_scale, "Scale", 1.0f, "%.0Lf", 10.0f);
+        MAKE_GUI_SETTING_FLOAT(new_image_size_scale, "Scale", 1.0f, "%.0Lf", 0.0f, 10.0f);
 
         cvui::text("Camera Parameter (Unified projection model)");
-        MAKE_GUI_SETTING_FLOAT(camera_parameter.focal_length, "Focal Length", 10.0f, "%.0Lf", 1000.0f);
-        MAKE_GUI_SETTING_FLOAT(camera_parameter.xi, "xi", 0.001f, "%.03Lf", 1.2f);
+        MAKE_GUI_SETTING_FLOAT(camera_parameter.focal_length, "Focal Length", 10.0f, "%.0Lf", 0.0f, 1000.0f);
+        MAKE_GUI_SETTING_FLOAT(camera_parameter.xi, "xi", 0.001f, "%.03Lf", 0.01f, 1.2f);
 
         if (cvui::button(200, 20, "Update")) {
             update_camera_parameter = true;

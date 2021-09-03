@@ -45,8 +45,8 @@ static bool is_floor_mode = true;
 
 
 /*** Function ***/
-static inline float Deg2Rad(float deg) { return static_cast<float>(deg * M_PI / 180.0f); }
-static inline float Rad2Deg(float rad) { return static_cast<float>(rad * 180.0f / M_PI); }
+static inline float Deg2Rad(float deg) { return static_cast<float>(deg * M_PI / 180.0); }
+static inline float Rad2Deg(float rad) { return static_cast<float>(rad * 180.0 / M_PI); }
 
 static float FocalLength()
 {
@@ -55,6 +55,17 @@ static float FocalLength()
 }
 
 typedef struct CameraParameter_ {
+    float& pitch() { return rvec.at<float>(0); }
+    float& yaw() { return rvec.at<float>(1); }
+    float& roll() { return rvec.at<float>(2); }
+    float& x() { return tvec.at<float>(0); }
+    float& y() { return tvec.at<float>(1); }
+    float& z() { return tvec.at<float>(2); }
+    float& fx() { return camera_matrix.at<float>(0); }
+    float& cx() { return camera_matrix.at<float>(2); }
+    float& fy() { return camera_matrix.at<float>(4); }
+    float& cy() { return camera_matrix.at<float>(5); }
+
     /* float, 3 x 1, pitch,  yaw, roll */
     cv::Mat rvec;
 
@@ -70,34 +81,24 @@ typedef struct CameraParameter_ {
     /* Default Parameters */
     void ResetFloor()
     {
-        float default_rvec[] = { Deg2Rad(0.0f), Deg2Rad(0.0f), Deg2Rad(0.0f) };
-        float default_tvec[] = { 0, 10.f, 0 };
-        float default_camera_matrix[] = {
+        rvec = (cv::Mat_<float>(3, 1) << Deg2Rad(0.0f), Deg2Rad(0.0f), Deg2Rad(0.0f));
+        tvec = (cv::Mat_<float>(3, 1) << 0.0f, 10.0f, 0.0f);
+        camera_matrix = (cv::Mat_<float>(3, 3) <<
             FocalLength(),             0,  kWidth / 2.f,
                         0, FocalLength(), kHeight / 2.f,
-                        0,             0,             1 };
-        float default_coef[] = { -0.1f, 0.01f, -0.005f, -0.001f, 0.0f };
-
-        rvec = cv::Mat(3, 1, CV_32FC1, default_rvec).clone();
-        tvec = cv::Mat(3, 1, CV_32FC1, default_tvec).clone();
-        camera_matrix = cv::Mat(3, 3, CV_32FC1, default_camera_matrix).clone();
-        dist_coeff = cv::Mat(5, 1, CV_32FC1, default_coef).clone();
+                        0,             0,             1);
+        dist_coeff = (cv::Mat_<float>(5, 1) << -0.1f, 0.01f, -0.005f, -0.001f, 0.0f);
     }
 
     void ResetWall()
     {
-        float default_rvec[] = { Deg2Rad(0.0f), Deg2Rad(0.0f), Deg2Rad(0.0f) };
-        float default_tvec[] = { 0, 0.f, 100.0f };
-        float default_camera_matrix[] = {
+        rvec = (cv::Mat_<float>(3, 1) << Deg2Rad(0.0f), Deg2Rad(0.0f), Deg2Rad(0.0f));
+        tvec = (cv::Mat_<float>(3, 1) << 0.0f, 0.0f, 100.0f);
+        camera_matrix = (cv::Mat_<float>(3, 3) <<
             FocalLength(),             0,  kWidth / 2.f,
                         0, FocalLength(), kHeight / 2.f,
-                        0,             0,             1 };
-        float default_coef[] = { -0.1f, 0.01f, -0.005f, -0.001f, 0.0f };
-
-        rvec = cv::Mat(3, 1, CV_32FC1, default_rvec).clone();
-        tvec = cv::Mat(3, 1, CV_32FC1, default_tvec).clone();
-        camera_matrix = cv::Mat(3, 3, CV_32FC1, default_camera_matrix).clone();
-        dist_coeff = cv::Mat(5, 1, CV_32FC1, default_coef).clone();
+                        0,             0,             1);
+        dist_coeff = (cv::Mat_<float>(5, 1) << -0.1f, 0.01f, -0.005f, -0.001f, 0.0f);
     }
 
     CameraParameter_() { ResetFloor(); }
@@ -152,7 +153,7 @@ static void loop_main()
 
 
 
-#define MAKE_GUI_SETTING_FLOAT(VAL, LABEL, STEP, FORMAT, RANGE) {\
+#define MAKE_GUI_SETTING_FLOAT(VAL, LABEL, STEP, FORMAT, RANGE0, RANGE1) {\
 cvui::beginColumn(-1, -1, 2);\
 double temp_double_current = static_cast<double>(VAL);\
 double temp_double_new = temp_double_current;\
@@ -160,7 +161,7 @@ float temp_float_current = VAL;\
 float temp_float_new = temp_float_current;\
 cvui::text(LABEL);\
 cvui::counter(&temp_double_new, STEP, FORMAT);\
-cvui::trackbar<float>(200, &temp_float_new, -RANGE, RANGE);\
+cvui::trackbar<float>(200, &temp_float_new, RANGE0, RANGE1);\
 if (temp_double_new != temp_double_current) VAL = static_cast<float>(temp_double_new);\
 if (temp_float_new != temp_float_current) VAL = temp_float_new;\
 cvui::endColumn();\
@@ -184,40 +185,40 @@ static void loop_param()
             camera_parameter.ResetWall();
         }
         cvui::endRow();
-        
-        cvui::text("Camera Parameter (internal)");
-        MAKE_GUI_SETTING_FLOAT(camera_parameter.camera_matrix.at<float>(0), "Focal Length", 10.0f, "%.0Lf", 1000.0f);
-        camera_parameter.camera_matrix.at<float>(4) = camera_parameter.camera_matrix.at<float>(0);
 
-        MAKE_GUI_SETTING_FLOAT(camera_parameter.dist_coeff.at<float>(0), "dist: k1", 0.00001f, "%.05Lf", 0.4f);
-        MAKE_GUI_SETTING_FLOAT(camera_parameter.dist_coeff.at<float>(1), "dist: k2", 0.00001f, "%.05Lf", 0.1f);
-        MAKE_GUI_SETTING_FLOAT(camera_parameter.dist_coeff.at<float>(2), "dist: p1", 0.00001f, "%.05Lf", 0.1f);
-        MAKE_GUI_SETTING_FLOAT(camera_parameter.dist_coeff.at<float>(3), "dist: p2", 0.00001f, "%.05Lf", 0.1f);
-        MAKE_GUI_SETTING_FLOAT(camera_parameter.dist_coeff.at<float>(4), "dist: k3", 0.00001f, "%.05Lf", 0.1f);
+        cvui::text("Camera Parameter (internal)");
+        MAKE_GUI_SETTING_FLOAT(camera_parameter.fx(), "Focal Length", 10.0f, "%.0Lf", 0.0f, 1000.0f);
+        camera_parameter.fy() = camera_parameter.fx();
+
+        MAKE_GUI_SETTING_FLOAT(camera_parameter.dist_coeff.at<float>(0), "dist: k1", 0.00001f, "%.05Lf", -0.4f, 0.4f);
+        MAKE_GUI_SETTING_FLOAT(camera_parameter.dist_coeff.at<float>(1), "dist: k2", 0.00001f, "%.05Lf", -0.1f, 0.1f);
+        MAKE_GUI_SETTING_FLOAT(camera_parameter.dist_coeff.at<float>(2), "dist: p1", 0.00001f, "%.05Lf", -0.1f, 0.1f);
+        MAKE_GUI_SETTING_FLOAT(camera_parameter.dist_coeff.at<float>(3), "dist: p2", 0.00001f, "%.05Lf", -0.1f, 0.1f);
+        MAKE_GUI_SETTING_FLOAT(camera_parameter.dist_coeff.at<float>(4), "dist: k3", 0.00001f, "%.05Lf", -0.1f, 0.1f);
 
         cvui::text("Camera Parameter (external)");
-        float temp_deg = Rad2Deg(camera_parameter.rvec.at<float>(0));
-        MAKE_GUI_SETTING_FLOAT(temp_deg, "Pitch", 1.0f, "%.0Lf", 90.0f);
-        camera_parameter.rvec.at<float>(0) = Deg2Rad(temp_deg);
+        float temp_deg = Rad2Deg(camera_parameter.pitch());
+        MAKE_GUI_SETTING_FLOAT(temp_deg, "Pitch", 1.0f, "%.0Lf", -90.0f, 90.0f);
+        camera_parameter.pitch() = Deg2Rad(temp_deg);
 
-        temp_deg = Rad2Deg(camera_parameter.rvec.at<float>(1));
-        MAKE_GUI_SETTING_FLOAT(temp_deg, "Yaw", 1.0f, "%.0Lf", 90.0f);
-        camera_parameter.rvec.at<float>(1) = Deg2Rad(temp_deg);
+        temp_deg = Rad2Deg(camera_parameter.yaw());
+        MAKE_GUI_SETTING_FLOAT(temp_deg, "Yaw", 1.0f, "%.0Lf", -90.0f, 90.0f);
+        camera_parameter.yaw() = Deg2Rad(temp_deg);
 
-        temp_deg = Rad2Deg(camera_parameter.rvec.at<float>(2));
-        MAKE_GUI_SETTING_FLOAT(temp_deg, "Roll", 1.0f, "%.0Lf", 90.0f);
-        camera_parameter.rvec.at<float>(2) = Deg2Rad(temp_deg);
+        temp_deg = Rad2Deg(camera_parameter.roll());
+        MAKE_GUI_SETTING_FLOAT(temp_deg, "Roll", 1.0f, "%.0Lf", -90.0f, 90.0f);
+        camera_parameter.roll() = Deg2Rad(temp_deg);
 
-        MAKE_GUI_SETTING_FLOAT(camera_parameter.tvec.at<float>(0), "X", 1.0f, "%.0Lf", 20.0f);
-        MAKE_GUI_SETTING_FLOAT(camera_parameter.tvec.at<float>(1), "Y", 1.0f, "%.0Lf", 20.0f);
-        MAKE_GUI_SETTING_FLOAT(camera_parameter.tvec.at<float>(2), "Z", 1.0f, "%.0Lf", 20.0f);
+        MAKE_GUI_SETTING_FLOAT(camera_parameter.x(), "X", 1.0f, "%.0Lf", -20.0f, 20.0f);
+        MAKE_GUI_SETTING_FLOAT(camera_parameter.y(), "Y", 1.0f, "%.0Lf", -20.0f, 20.0f);
+        MAKE_GUI_SETTING_FLOAT(camera_parameter.z(), "Z", 1.0f, "%.0Lf", -20.0f, 20.0f);
     }
     cvui::endColumn();
 
     cvui::imshow(kWindowParam, mat);
 }
 
-static void CallbackMouseMain(int32_t event, int32_t x, int32_t y, int32_t flags, void *userdata)
+static void CallbackMouseMain(int32_t event, int32_t x, int32_t y, int32_t flags, void* userdata)
 {
     static constexpr float kIncAnglePerPx = 0.01f;
     static constexpr int32_t kInvalidValue = -99999;
@@ -230,15 +231,16 @@ static void CallbackMouseMain(int32_t event, int32_t x, int32_t y, int32_t flags
         s_drag_previous_point.y = y;
     } else {
         if (s_drag_previous_point.x != kInvalidValue) {
-            camera_parameter.rvec.at<float>(1) += kIncAnglePerPx * (x - s_drag_previous_point.x);
-            camera_parameter.rvec.at<float>(0) -= kIncAnglePerPx * (y - s_drag_previous_point.y);
+            camera_parameter.yaw() += kIncAnglePerPx * (x - s_drag_previous_point.x);
+            camera_parameter.pitch() -= kIncAnglePerPx * (y - s_drag_previous_point.y);
             s_drag_previous_point.x = x;
             s_drag_previous_point.y = y;
         }
-        camera_parameter.rvec.at<float>(1) = (std::min)(Deg2Rad(90.0f), (std::max)(camera_parameter.rvec.at<float>(1), Deg2Rad(-90.0f)));
-        camera_parameter.rvec.at<float>(0) = (std::min)(Deg2Rad(90.0f), (std::max)(camera_parameter.rvec.at<float>(0), Deg2Rad(-90.0f)));
+        camera_parameter.yaw() = (std::min)(Deg2Rad(90.0f), (std::max)(camera_parameter.yaw(), Deg2Rad(-90.0f)));
+        camera_parameter.pitch() = (std::min)(Deg2Rad(90.0f), (std::max)(camera_parameter.pitch(), Deg2Rad(-90.0f)));
     }
 }
+
 
 static void TreatKeyInputMain(int32_t key)
 {
@@ -246,46 +248,46 @@ static void TreatKeyInputMain(int32_t key)
     key &= 0xFF;
     switch (key) {
     case 'w':
-        camera_parameter.tvec.at<float>(2) -= kIncPosPerFrame;
+        camera_parameter.z() -= kIncPosPerFrame;
         break;
     case 'W':
-        camera_parameter.tvec.at<float>(2) -= kIncPosPerFrame * 3;
+        camera_parameter.z() -= kIncPosPerFrame * 3;
         break;
     case 's':
-        camera_parameter.tvec.at<float>(2) += kIncPosPerFrame;
+        camera_parameter.z() += kIncPosPerFrame;
         break;
     case 'S':
-        camera_parameter.tvec.at<float>(2) += kIncPosPerFrame * 3;
+        camera_parameter.z() += kIncPosPerFrame * 3;
         break;
     case 'a':
-        camera_parameter.tvec.at<float>(0) += kIncPosPerFrame;
+        camera_parameter.x() += kIncPosPerFrame;
         break;
     case 'A':
-        camera_parameter.tvec.at<float>(0) += kIncPosPerFrame * 3;
+        camera_parameter.x() += kIncPosPerFrame * 3;
         break;
     case 'd':
-        camera_parameter.tvec.at<float>(0) -= kIncPosPerFrame;
+        camera_parameter.x() -= kIncPosPerFrame;
         break;
     case 'D':
-        camera_parameter.tvec.at<float>(0) -= kIncPosPerFrame * 3;
+        camera_parameter.x() -= kIncPosPerFrame * 3;
         break;
     case 'z':
-        camera_parameter.tvec.at<float>(1) += kIncPosPerFrame;
+        camera_parameter.y() += kIncPosPerFrame;
         break;
     case 'Z':
-        camera_parameter.tvec.at<float>(1) += kIncPosPerFrame * 3;
+        camera_parameter.y() += kIncPosPerFrame * 3;
         break;
     case 'x':
-        camera_parameter.tvec.at<float>(1) -= kIncPosPerFrame;
+        camera_parameter.y() -= kIncPosPerFrame;
         break;
     case 'X':
-        camera_parameter.tvec.at<float>(1) -= kIncPosPerFrame * 3;
+        camera_parameter.y() -= kIncPosPerFrame * 3;
         break;
     case 'q':
-        camera_parameter.rvec.at<float>(2) += 0.1f;
+        camera_parameter.roll() += 0.1f;
         break;
     case 'e':
-        camera_parameter.rvec.at<float>(2) -= 0.1f;
+        camera_parameter.roll() -= 0.1f;
         break;
     }
 }

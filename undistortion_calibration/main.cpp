@@ -30,8 +30,8 @@ limitations under the License.
 /*** Global variable ***/
 
 /*** Function ***/
-static inline float Deg2Rad(float deg) { return static_cast<float>(deg * M_PI / 180.0f); }
-static inline float Rad2Deg(float rad) { return static_cast<float>(rad * 180.0f / M_PI); }
+static inline float Deg2Rad(float deg) { return static_cast<float>(deg * M_PI / 180.0); }
+static inline float Rad2Deg(float rad) { return static_cast<float>(rad * 180.0 / M_PI); }
 
 int main(int argc, char *argv[])
 {
