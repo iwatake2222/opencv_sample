@@ -77,9 +77,9 @@ static void loop_main(const cv::Mat& image_org)
     cv::projectPoints(object_point_list, camera_top.parameter.rvec, camera_top.parameter.tvec, camera_top.parameter.K, camera_top.parameter.dist_coeff, image_point_top_list);
 
     /* Perspective Transform */
-    cv::Mat mat_affine = cv::getPerspectiveTransform(&image_point_real_list[0], &image_point_top_list[0]);
+    cv::Mat mat_transform = cv::getPerspectiveTransform(&image_point_real_list[0], &image_point_top_list[0]);
     cv::Mat mat_output = cv::Mat(image_org.size(), CV_8UC3, cv::Scalar(70, 70, 70));
-    cv::warpPerspective(image_org, mat_output, mat_affine, mat_output.size(), cv::INTER_LINEAR, cv::BORDER_TRANSPARENT);
+    cv::warpPerspective(image_org, mat_output, mat_transform, mat_output.size(), cv::INTER_LINEAR, cv::BORDER_TRANSPARENT);
 
     cvui::imshow(kWindowMain, mat_output);
 }
