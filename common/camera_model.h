@@ -139,7 +139,7 @@ public:
     {
         /* todo: the conversion result is diferent from cv::projectPoints when more than two angles changes */
         /*** Projection ***/
-        /* s[u, v, 1] = A * [R t] * [M, 1]  */
+        /* s[u, v, 1] = K * [R t] * [M, 1]  */
         cv::Mat K = parameter.K;
         cv::Mat R = MakeRotateMat(Rad2Deg(parameter.pitch()), Rad2Deg(parameter.yaw()), Rad2Deg(parameter.roll()));
         cv::Mat Rt = (cv::Mat_<float>(3, 4) <<
@@ -147,13 +147,13 @@ public:
             R.at<float>(3), R.at<float>(4), R.at<float>(5), parameter.y(),
             R.at<float>(6), R.at<float>(7), R.at<float>(8), parameter.z());
 
-        cv::Mat Mw = (cv::Mat_<float>(4, 1) << object_point.x, object_point.y, object_point.z, 1);
+        cv::Mat M = (cv::Mat_<float>(4, 1) << object_point.x, object_point.y, object_point.z, 1);
 
-        cv::Mat uv = K * Rt * Mw;
+        cv::Mat UV = K * Rt * M;
 
-        float u = uv.at<float>(0);
-        float v = uv.at<float>(1);
-        float s = uv.at<float>(2);
+        float u = UV.at<float>(0);
+        float v = UV.at<float>(1);
+        float s = UV.at<float>(2);
         u /= s;
         v /= s;
         /*** Undistort ***/
@@ -172,8 +172,56 @@ public:
         image_point.y = vv * parameter.fy() + parameter.cy();
     }
 
+    void PRINT_MAT_FLOAT(const cv::Mat& mat, int32_t size)
+    {
+        for (int32_t i = 0; i < size; i++) {
+            printf("%d: %.3f\n", i, mat.at<float>(i));
+        }
+    }
+
     void ProjectImage2GroundPlane(const cv::Point2f& image_point, cv::Point3f& object_point)
     {
-        // todo
+        /*** Undistort image point ***/
+        std::vector<cv::Point2f> original_uv{ image_point };
+        std::vector<cv::Point2f> image_point_undistort;
+        cv::undistortPoints(original_uv, image_point_undistort, parameter.K, parameter.dist_coeff, parameter.K);
+        float u = image_point_undistort[0].x;
+        float v = image_point_undistort[0].y;
+
+
+        /*** Calculate point in ground plane (in world coordinate) ***/
+        /* Main idea:*/
+        /*   s * [u, v, 1] = K * [R t] * [M, 1]  */
+        /*   s * [u, v, 1] = K * R * M + K * t */
+        /*   s * Kinv * [u, v, 1] = R * M + t */
+        /*   s * Kinv * [u, v, 1] - t = R * M */
+        /*   Rinv * (s * Kinv * [u, v, 1] - t) = M */
+        /* calculate s */
+        /*   s * Rinv * Kinv * [u, v, 1] = M + R_inv * t */
+        /*      where, M = (X, Y, Z) and Y = camera_height(ground_plane) */
+        /*      so , we can solve left[1] = M[1](camera_height) */
+
+        cv::Mat K = parameter.K;
+        cv::Mat R = MakeRotateMat(Rad2Deg(parameter.pitch()), Rad2Deg(parameter.yaw()), Rad2Deg(parameter.roll()));
+        cv::Mat K_inv;
+        cv::invert(K, K_inv);
+        cv::Mat R_inv;
+        cv::invert(R, R_inv);
+        cv::Mat t = parameter.tvec;
+        cv::Mat UV = (cv::Mat_<float>(3, 1) << u, v, 1);
+
+        /* calculate s */
+        cv::Mat LEFT_WO_S = R_inv * K_inv * UV;
+        cv::Mat RIGHT_WO_M = R_inv * t;
+        float s = (t.at<float>(1) + RIGHT_WO_M.at<float>(1)) / LEFT_WO_S.at<float>(1);
+
+        /* calculate M */
+        cv::Mat TEMP = R_inv * (s * K_inv * UV - t);
+
+        object_point.x = TEMP.at<float>(0);
+        object_point.y = TEMP.at<float>(1);
+        object_point.z = TEMP.at<float>(2);
+
+        //PRINT_MAT_FLOAT(TEMP, 3);
     }
 };

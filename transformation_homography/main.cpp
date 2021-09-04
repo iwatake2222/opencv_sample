@@ -76,7 +76,7 @@ static void CallbackMouseMain(int32_t event, int32_t x, int32_t y, int32_t flags
     } else if (event == cv::EVENT_LBUTTONDOWN) {
         cv::Point2f point(static_cast<float>(x), static_cast<float>(y));
         selecting_point_list.push_back(point);
-     } else {
+    } else {
     }
 }
 
