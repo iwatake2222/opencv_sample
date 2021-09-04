@@ -26,209 +26,59 @@ limitations under the License.
 #define CVUI_IMPLEMENTATION
 #include "cvui.h"
 
+#include "camera_model.h"
 
 /*** Macro ***/
 static constexpr char kWindowMain[] = "WindowMain";
 static constexpr char kWindowParam[] = "WindowParam";
-
-static constexpr int32_t kWidth = 1280;
-static constexpr int32_t kHeight = 720;
-static constexpr float   kFovDeg = 130.0f;
+static constexpr float kFovDeg = 130.0f;
 
 
 /*** Global variable ***/
+static CameraModel camera_real;
+static CameraModel camera_top;
 
 
 /*** Function ***/
-static inline float Deg2Rad(float deg) { return static_cast<float>(deg * M_PI / 180.0); }
-static inline float Rad2Deg(float rad) { return static_cast<float>(rad * 180.0 / M_PI); }
-
-static float FocalLength()
+void ResetCameraPose()
 {
-    /* (w/2) / f = tan(fov/2) */
-    return (kWidth / 2) / std::tanf(Deg2Rad(kFovDeg / 2));
+    camera_real.parameter.SetExtrinsic(
+        { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
+        { 0.0f, 1.0f, 0.0f });   /* tvec */
+    camera_top.parameter.SetExtrinsic(
+        { 90.0f, 0.0f, 0.0f },    /* rvec [deg] */
+        {  0.0f, 8.0f, 7.0f });   /* tvec */  /* tvec is in camera coordinate, so Z is height because pitch = 90 */
 }
 
-typedef struct CameraParameter_ {
-    float& pitch() { return rvec.at<float>(0); }
-    float& yaw() { return rvec.at<float>(1); }
-    float& roll() { return rvec.at<float>(2); }
-    float& x() { return tvec.at<float>(0); }
-    float& y() { return tvec.at<float>(1); }
-    float& z() { return tvec.at<float>(2); }
-    float& fx() { return camera_matrix.at<float>(0); }
-    float& cx() { return camera_matrix.at<float>(2); }
-    float& fy() { return camera_matrix.at<float>(4); }
-    float& cy() { return camera_matrix.at<float>(5); }
-
-    /* float, 3 x 1, pitch,  yaw, roll */
-    cv::Mat rvec;
-
-    /* float, 3 x 1, (X, Y, Z): horizontal, vertical, depth */
-    cv::Mat tvec;
-
-    /* float, 3 x 3 */
-    cv::Mat camera_matrix;
-
-    /* float, 5 x 1 */
-    cv::Mat dist_coeff;
-
-    /* Default Parameters */
-    void ResetReal()
-    {
-        rvec = (cv::Mat_<float>(3, 1) << Deg2Rad(0.0f), Deg2Rad(0.0f), Deg2Rad(0.0f));
-        tvec = (cv::Mat_<float>(3, 1) << 0.0f, 1.0f, 0.0f);
-        camera_matrix = (cv::Mat_<float>(3, 3) <<
-            FocalLength(),             0,  kWidth / 2.f,
-                        0, FocalLength(), kHeight / 2.f,
-                        0,             0,             1);
-        dist_coeff = (cv::Mat_<float>(5, 1) << 0.0f, 0.0f, 0.0f, 0.0f, 0.0f);
-    }
-
-    void ResetTopView()
-    {
-        ResetReal();
-        rvec = (cv::Mat_<float>(3, 1) << Deg2Rad(90.0f), Deg2Rad(0.0f), Deg2Rad(0.0f));
-        tvec = (cv::Mat_<float>(3, 1) << 0.0f, 8.0f, 7.0f);        /* tvec is in camera coordinate, so Z is height because pitch = 90 */
-    }
-
-    CameraParameter_() { ResetReal(); }
-} CameraParameter;
-
-static CameraParameter camera_parameter_real;
-static CameraParameter camera_parameter_topview;
-
-
-void RotateObject(float x_deg, float y_deg, float z_deg, std::vector<cv::Point3f>& object_point_list)
+void ResetCamera(int32_t width, int32_t height)
 {
-    float x_rad = Deg2Rad(x_deg);
-    float y_rad = Deg2Rad(y_deg);
-    float z_rad = Deg2Rad(z_deg);
-
-    cv::Mat R_x = (cv::Mat_<float>(3, 3) <<
-                1, 0, 0,
-                0, std::cos(x_rad), -std::sin(x_rad),
-                0, std::sin(x_rad), std::cos(x_rad));
-
-    cv::Mat R_y = (cv::Mat_<float>(3, 3) <<
-                std::cos(y_rad), 0, std::sin(y_rad),
-                0, 1, 0,
-                -std::sin(y_rad), 0, std::cos(y_rad));
-
-    cv::Mat R_z = (cv::Mat_<float>(3, 3) <<
-                std::cos(z_rad), -std::sin(z_rad), 0,
-                std::sin(z_rad), std::cos(z_rad), 0,
-                0, 0, 1);
-
-    for (auto& object_point : object_point_list) {
-        cv::Mat p = (cv::Mat_<float>(3, 1) << object_point.x, object_point.y, object_point.z);
-        p = R_x * R_y * R_z * p;
-        object_point.x = p.at<float>(0);
-        object_point.y = p.at<float>(1);
-        object_point.z = p.at<float>(2);
-    }
+    camera_real.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kFovDeg));
+    camera_top.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kFovDeg));
+    ResetCameraPose();
 }
 
-void MoveObject(float x, float y, float z, std::vector<cv::Point3f>& object_point_list)
-{
-    for (auto& object_point : object_point_list) {
-        object_point.x += x;
-        object_point.y += y;
-        object_point.z += z;
-    }
-}
-
-void ProjectWorld2Image(CameraParameter camera_parameter, const cv::Point3f& object_point, cv::Point2f& image_point)
-{
-    /* todo: the conversion result is diferent from cv::projectPoints when more than two angles changes */
-    /*** Projection ***/
-    /* s[u, v, 1] = A * [R t] * [M, 1]  */
-    cv::Mat A = camera_parameter.camera_matrix;
-    cv::Mat R_x = (cv::Mat_<float>(3, 3) <<
-        1, 0, 0,
-        0, std::cos(camera_parameter.pitch()), -std::sin(camera_parameter.pitch()),
-        0, std::sin(camera_parameter.pitch()), std::cos(camera_parameter.pitch()));
-    cv::Mat R_y = (cv::Mat_<float>(3, 3) <<
-        std::cos(camera_parameter.yaw()), 0, std::sin(camera_parameter.yaw()),
-        0, 1, 0,
-        -std::sin(camera_parameter.yaw()), 0, std::cos(camera_parameter.yaw()));
-    cv::Mat R_z = (cv::Mat_<float>(3, 3) <<
-        std::cos(camera_parameter.roll()), -std::sin(camera_parameter.roll()), 0,
-        std::sin(camera_parameter.roll()), std::cos(camera_parameter.roll()), 0,
-        0, 0, 1);
-    cv::Mat R = R_z * R_x * R_y;
-    cv::Mat Rt = (cv::Mat_<float>(3, 4) <<
-        R.at<float>(0), R.at<float>(1), R.at<float>(2), camera_parameter.x(),
-        R.at<float>(3), R.at<float>(4), R.at<float>(5), camera_parameter.y(),
-        R.at<float>(6), R.at<float>(7), R.at<float>(8), camera_parameter.z());
-
-    cv::Mat Mw = (cv::Mat_<float>(4, 1) << object_point.x, object_point.y, object_point.z, 1);
-
-    cv::Mat uv = A * Rt * Mw;
-
-    float u = uv.at<float>(0);
-    float v = uv.at<float>(1);
-    float s = uv.at<float>(2);
-
-    /*** Undistort ***/
-    float r = std::sqrtf(u * u + v * v);
-    float r2 = r * r;
-    float r4 = r2 * r2;
-    float k1 = camera_parameter.dist_coeff.at<float>(0);
-    float k2 = camera_parameter.dist_coeff.at<float>(1);
-    float p1 = camera_parameter.dist_coeff.at<float>(3);
-    float p2 = camera_parameter.dist_coeff.at<float>(4);
-    u = u + u * (k1 * r2 + k2 * r4 /*+ k3 * r6 */) + (2 * p1 * u * v) + p2 * (r2 + 2 * u * u);
-    v = v + v * (k1 * r2 + k2 * r4 /*+ k3 * r6 */) + (2 * p2 * u * v) + p1 * (r2 + 2 * v * v);
-    
-    image_point.x = u / s;
-    image_point.y = v / s;
-}
-
-
-
-void CreateMapping(cv::Size size, std::vector<cv::Point2f>& image_point_list, std::vector<cv::Point3f>& object_point_list)
-{
-    /*** Select target area (possible road area) and calculate corresponding points in world coordinate ***/
-    /* todo: consider camera parameter (external) like pitch, yaw, roll */
-    static constexpr float kMargin = 10.0f;
-    image_point_list = {
-        { kMargin, size.height / 2.0f + kMargin },
-        { size.width - kMargin, size.height / 2.0f + kMargin },
-        { size.width - kMargin, size.height - kMargin },
-        { kMargin, size.height - kMargin },
-    };
-
-    float focal_length = camera_parameter_real.fx();
-    float camera_y = camera_parameter_real.y();
-
-    for (auto& image_point : image_point_list) {
-        float x_from_center = image_point.x - camera_parameter_real.cx();
-        float y_from_center = image_point.y - camera_parameter_real.cy();
-        cv::Point3f object_point;
-        object_point.z = focal_length * camera_y / y_from_center;
-        object_point.x = x_from_center * camera_y / y_from_center;
-        object_point.y = 0;
-        object_point_list.push_back(object_point);
-    }
-}
 
 static void loop_main(const cv::Mat& image_org)
 {
     cvui::context(kWindowMain);
 
-    /* Generate object points (3D: world coordinate) using the dash camera (real camera) */
-    std::vector<cv::Point3f> object_point_list;
-    std::vector<cv::Point2f> roi_image_point_list;
-    CreateMapping(image_org.size(), roi_image_point_list, object_point_list);
+    /*** Generate mapping b/w object points (3D: world coordinate) and image points (real camera) */
+    std::vector<cv::Point3f> object_point_list = {   /* Target area (possible road area) */
+        { -1.0f, 0, 10.0f },
+        {  1.0f, 0, 10.0f },
+        { -1.0f, 0,  3.0f },
+        {  1.0f, 0,  3.0f },
+    };
+    std::vector<cv::Point2f> image_point_real_list;
+    cv::projectPoints(object_point_list, camera_real.parameter.rvec, camera_real.parameter.tvec, camera_real.parameter.K, camera_real.parameter.dist_coeff, image_point_real_list);
 
     /* Convert to image points (2D) using the top view camera (virtual camera) */
-    std::vector<cv::Point2f> image_point_list;
-    cv::projectPoints(object_point_list, camera_parameter_topview.rvec, camera_parameter_topview.tvec, camera_parameter_topview.camera_matrix, camera_parameter_topview.dist_coeff, image_point_list);
+    std::vector<cv::Point2f> image_point_top_list;
+    cv::projectPoints(object_point_list, camera_top.parameter.rvec, camera_top.parameter.tvec, camera_top.parameter.K, camera_top.parameter.dist_coeff, image_point_top_list);
 
-    /* Affine transform */
-    cv::Mat mat_affine = cv::getPerspectiveTransform(&roi_image_point_list[0], &image_point_list[0]);
-    cv::Mat mat_output = cv::Mat(kHeight, kWidth, CV_8UC3, cv::Scalar(70, 70, 70));
+    /* Perspective Transform */
+    cv::Mat mat_affine = cv::getPerspectiveTransform(&image_point_real_list[0], &image_point_top_list[0]);
+    cv::Mat mat_output = cv::Mat(image_org.size(), CV_8UC3, cv::Scalar(70, 70, 70));
     cv::warpPerspective(image_org, mat_output, mat_affine, mat_output.size(), cv::INTER_LINEAR, cv::BORDER_TRANSPARENT);
 
     cvui::imshow(kWindowMain, mat_output);
@@ -252,33 +102,47 @@ cvui::endColumn();\
 static void loop_param()
 {
     cvui::context(kWindowParam);
-    cv::Mat mat = cv::Mat(600, 300, CV_8UC3, cv::Scalar(70, 70, 70));
+    cv::Mat mat = cv::Mat(800, 300, CV_8UC3, cv::Scalar(70, 70, 70));
 
     cvui::beginColumn(mat, 10, 10, -1, -1, 2);
     {
         if (cvui::button(120, 20, "Reset")) {
-            camera_parameter_real.ResetReal();
-            camera_parameter_topview.ResetTopView();
+            ResetCameraPose();
         }
 
-        cvui::text("Camera Parameter (internal)");
-        MAKE_GUI_SETTING_FLOAT(camera_parameter_real.fx(), "Focal Length", 10.0f, "%.0Lf", 0.0f, 1000.0f);
-        camera_parameter_real.fy() = camera_parameter_real.fx();
-        camera_parameter_topview.fx() = camera_parameter_real.fx();
-        camera_parameter_topview.fy() = camera_parameter_real.fy();
+        cvui::text("Camera Parameter (Intrinsic)");
+        MAKE_GUI_SETTING_FLOAT(camera_real.parameter.fx(), "Focal Length", 10.0f, "%.0Lf", 0.0f, 1000.0f);
+        camera_real.parameter.fy() = camera_real.parameter.fx();
+        camera_top.parameter.fx() = camera_real.parameter.fx();
+        camera_top.parameter.fy() = camera_real.parameter.fy();
 
-        cvui::text("Camera Parameter (external)");
-        float temp_deg = Rad2Deg(camera_parameter_topview.pitch());
+        cvui::text("Top Camera Parameter (Extrinsic)");
+        float temp_deg = Rad2Deg(camera_top.parameter.pitch());
         MAKE_GUI_SETTING_FLOAT(temp_deg, "Pitch", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera_parameter_topview.pitch() = Deg2Rad(temp_deg);
+        camera_top.parameter.pitch() = Deg2Rad(temp_deg);
 
-        temp_deg = Rad2Deg(camera_parameter_topview.yaw());
+        temp_deg = Rad2Deg(camera_top.parameter.yaw());
         MAKE_GUI_SETTING_FLOAT(temp_deg, "Yaw", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera_parameter_topview.yaw() = Deg2Rad(temp_deg);
+        camera_top.parameter.yaw() = Deg2Rad(temp_deg);
 
-        temp_deg = Rad2Deg(camera_parameter_topview.roll());
+        temp_deg = Rad2Deg(camera_top.parameter.roll());
         MAKE_GUI_SETTING_FLOAT(temp_deg, "Roll", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera_parameter_topview.roll() = Deg2Rad(temp_deg);
+        camera_top.parameter.roll() = Deg2Rad(temp_deg);
+
+        cvui::text("Real Camera Parameter (Extrinsic)");
+        MAKE_GUI_SETTING_FLOAT(camera_real.parameter.y(), "Height", 1.0f, "%.0Lf", 0.0f, 5.0f);
+
+        temp_deg = Rad2Deg(camera_real.parameter.pitch());
+        MAKE_GUI_SETTING_FLOAT(temp_deg, "Pitch", 1.0f, "%.0Lf", -90.0f, 90.0f);
+        camera_real.parameter.pitch() = Deg2Rad(temp_deg);
+
+        temp_deg = Rad2Deg(camera_real.parameter.yaw());
+        MAKE_GUI_SETTING_FLOAT(temp_deg, "Yaw", 1.0f, "%.0Lf", -90.0f, 90.0f);
+        camera_real.parameter.yaw() = Deg2Rad(temp_deg);
+
+        temp_deg = Rad2Deg(camera_real.parameter.roll());
+        MAKE_GUI_SETTING_FLOAT(temp_deg, "Roll", 1.0f, "%.0Lf", -90.0f, 90.0f);
+        camera_real.parameter.roll() = Deg2Rad(temp_deg);
 
     }
     cvui::endColumn();
@@ -299,13 +163,13 @@ static void CallbackMouseMain(int32_t event, int32_t x, int32_t y, int32_t flags
         s_drag_previous_point.y = y;
     } else {
         if (s_drag_previous_point.x != kInvalidValue) {
-            camera_parameter_topview.yaw() += kIncAnglePerPx * (x - s_drag_previous_point.x);
-            camera_parameter_topview.pitch() -= kIncAnglePerPx * (y - s_drag_previous_point.y);
+            camera_top.parameter.yaw() += kIncAnglePerPx * (x - s_drag_previous_point.x);
+            camera_top.parameter.pitch() -= kIncAnglePerPx * (y - s_drag_previous_point.y);
             s_drag_previous_point.x = x;
             s_drag_previous_point.y = y;
         }
-        camera_parameter_topview.yaw() = (std::min)(Deg2Rad(90.0f), (std::max)(camera_parameter_topview.yaw(), Deg2Rad(-90.0f)));
-        camera_parameter_topview.pitch() = (std::min)(Deg2Rad(90.0f), (std::max)(camera_parameter_topview.pitch(), Deg2Rad(-90.0f)));
+        camera_top.parameter.yaw() = (std::min)(Deg2Rad(90.0f), (std::max)(camera_top.parameter.yaw(), Deg2Rad(-90.0f)));
+        camera_top.parameter.pitch() = (std::min)(Deg2Rad(90.0f), (std::max)(camera_top.parameter.pitch(), Deg2Rad(-90.0f)));
     }
 }
 
@@ -316,46 +180,46 @@ static void TreatKeyInputMain(int32_t key)
     key &= 0xFF;
     switch (key) {
     case 'w':
-        camera_parameter_topview.z() -= kIncPosPerFrame;
+        camera_top.parameter.z() -= kIncPosPerFrame;
         break;
     case 'W':
-        camera_parameter_topview.z() -= kIncPosPerFrame * 3;
+        camera_top.parameter.z() -= kIncPosPerFrame * 3;
         break;
     case 's':
-        camera_parameter_topview.z() += kIncPosPerFrame;
+        camera_top.parameter.z() += kIncPosPerFrame;
         break;
     case 'S':
-        camera_parameter_topview.z() += kIncPosPerFrame * 3;
+        camera_top.parameter.z() += kIncPosPerFrame * 3;
         break;
     case 'a':
-        camera_parameter_topview.x() += kIncPosPerFrame;
+        camera_top.parameter.x() += kIncPosPerFrame;
         break;
     case 'A':
-        camera_parameter_topview.x() += kIncPosPerFrame * 3;
+        camera_top.parameter.x() += kIncPosPerFrame * 3;
         break;
     case 'd':
-        camera_parameter_topview.x() -= kIncPosPerFrame;
+        camera_top.parameter.x() -= kIncPosPerFrame;
         break;
     case 'D':
-        camera_parameter_topview.x() -= kIncPosPerFrame * 3;
+        camera_top.parameter.x() -= kIncPosPerFrame * 3;
         break;
     case 'z':
-        camera_parameter_topview.y() += kIncPosPerFrame;
+        camera_top.parameter.y() += kIncPosPerFrame;
         break;
     case 'Z':
-        camera_parameter_topview.y() += kIncPosPerFrame * 3;
+        camera_top.parameter.y() += kIncPosPerFrame * 3;
         break;
     case 'x':
-        camera_parameter_topview.y() -= kIncPosPerFrame;
+        camera_top.parameter.y() -= kIncPosPerFrame;
         break;
     case 'X':
-        camera_parameter_topview.y() -= kIncPosPerFrame * 3;
+        camera_top.parameter.y() -= kIncPosPerFrame * 3;
         break;
     case 'q':
-        camera_parameter_topview.roll() += 0.1f;
+        camera_top.parameter.roll() += 0.1f;
         break;
     case 'e':
-        camera_parameter_topview.roll() -= 0.1f;
+        camera_top.parameter.roll() -= 0.1f;
         break;
     }
 }
@@ -367,11 +231,10 @@ int main(int argc, char* argv[])
 
     cv::setMouseCallback(kWindowMain, CallbackMouseMain);
 
-    camera_parameter_real.ResetReal();
-    camera_parameter_topview.ResetTopView();
-
     static const std::string image_path = RESOURCE_DIR"/dashcam_00.jpg";
     cv::Mat image_org = cv::imread(image_path);
+
+    ResetCamera(image_org.cols, image_org.rows);
 
     while (true) {
         loop_main(image_org);

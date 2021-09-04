@@ -84,14 +84,14 @@ int main(int argc, char *argv[])
 
     std::vector<cv::Mat> rvec;
     std::vector<cv::Mat> tvec;
-    cv::Mat camera_matrix;
+    cv::Mat K;
     cv::Mat dist_coeff;
-    calibrateCamera(object_point_list, image_point_list, image_size, camera_matrix, dist_coeff, rvec, tvec, cv::CALIB_FIX_K3);
+    calibrateCamera(object_point_list, image_point_list, image_size, K, dist_coeff, rvec, tvec, cv::CALIB_FIX_K3);
     cv::Mat mapx, mapy;
-    cv::initUndistortRectifyMap(camera_matrix, dist_coeff, cv::Mat(), camera_matrix, image_size, CV_32FC1, mapx, mapy);
+    cv::initUndistortRectifyMap(K, dist_coeff, cv::Mat(), K, image_size, CV_32FC1, mapx, mapy);
 
     cv::FileStorage fs("calib.yaml", cv::FileStorage::WRITE);
-    fs << "camera_matrix" << camera_matrix;
+    fs << "camera_matrix" << K;
     fs << "dist_coeff" << dist_coeff;
     fs << "rvec" << rvec;
     fs << "tvec" << tvec;
@@ -103,7 +103,7 @@ int main(int argc, char *argv[])
         cv::Mat image_chessboard = cv::imread(image_path_list[i]);
         cv::Mat image_undistorted;
 #if 0
-        cv::undistort(image_chessboard, image_undistorted, camera_matrix, dist_coeff);
+        cv::undistort(image_chessboard, image_undistorted, K, dist_coeff);
 #else
         cv::remap(image_chessboard, image_undistorted, mapx, mapy, cv::INTER_LINEAR);
 #endif

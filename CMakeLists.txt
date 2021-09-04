@@ -13,7 +13,8 @@ include_directories(${OpenCV_INCLUDE_DIRS})
 link_libraries(${OpenCV_LIBS})
 
 include_directories(cvui)
-
+include_directories(common)
+add_subdirectory(common)
 
 add_subdirectory(undistortion_calibration)
 add_subdirectory(undistortion_manual_unified_projection)
