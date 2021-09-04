@@ -56,19 +56,17 @@ void ResetCamera(int32_t width, int32_t height)
 
 static void loop_main(const cv::Mat& image_org)
 {
-    const cv::Mat& image = image_org;
+    cv::Mat& image = image_org.clone();
     cvui::context(kWindowMain);
-    if (selecting_point_list.size() > 0) {
-        cv::Point2f point = selecting_point_list[0];
+    for (const auto& point : selecting_point_list) {
         cv::circle(image, point, 5, cv::Scalar(255, 0, 0), -1);
 
         cv::Point3f object_point;
         camera.ProjectImage2GroundPlane(point, object_point);
 
         char text[64];
-        snprintf(text, sizeof(text), "%.1f, %.1f, %.1f[m]", object_point.x, object_point.y, object_point.z);
+        snprintf(text, sizeof(text), "%.1f, %.1f[m]", object_point.x, object_point.z);
         cv::putText(image, text, point, cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
-        selecting_point_list.clear();
     }
     cvui::imshow(kWindowMain, image);
 }
@@ -97,6 +95,9 @@ static void loop_param()
     {
         if (cvui::button(120, 20, "Reset")) {
             ResetCameraPose();
+        }
+        if (cvui::button(120, 20, "ResetImage")) {
+            selecting_point_list.clear();
         }
 
         cvui::text("Camera Parameter (Intrinsic)");
