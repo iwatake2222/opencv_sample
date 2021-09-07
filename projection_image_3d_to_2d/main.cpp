@@ -52,6 +52,7 @@ void ResetCameraPose()
 void ResetCamera(int32_t width, int32_t height)
 {
     camera.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kFovDeg));
+    camera.parameter.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
     ResetCameraPose();
 }
 
@@ -122,6 +123,7 @@ static void loop_param()
         MAKE_GUI_SETTING_FLOAT(camera.parameter.dist_coeff.at<float>(2), "dist: p1", 0.00001f, "%.05Lf", -0.1f, 0.1f);
         MAKE_GUI_SETTING_FLOAT(camera.parameter.dist_coeff.at<float>(3), "dist: p2", 0.00001f, "%.05Lf", -0.1f, 0.1f);
         MAKE_GUI_SETTING_FLOAT(camera.parameter.dist_coeff.at<float>(4), "dist: k3", 0.00001f, "%.05Lf", -0.1f, 0.1f);
+        camera.parameter.UpdateNewCameraMatrix();
 
         cvui::text("Camera Parameter (external)");
         float temp_deg = Rad2Deg(camera.parameter.pitch());

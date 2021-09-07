@@ -54,6 +54,8 @@ void ResetCamera(int32_t width, int32_t height)
 {
     camera_real.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kFovDeg));
     camera_top.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kFovDeg));
+    camera_real.parameter.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
+    camera_top.parameter.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
     ResetCameraPose();
 }
 
@@ -115,6 +117,9 @@ static void loop_param()
         camera_real.parameter.fy() = camera_real.parameter.fx();
         camera_top.parameter.fx() = camera_real.parameter.fx();
         camera_top.parameter.fy() = camera_real.parameter.fy();
+
+        camera_real.parameter.UpdateNewCameraMatrix();
+        camera_top.parameter.UpdateNewCameraMatrix();
 
         cvui::text("Top Camera Parameter (Extrinsic)");
         float temp_deg = Rad2Deg(camera_top.parameter.pitch());

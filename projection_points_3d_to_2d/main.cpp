@@ -51,20 +51,20 @@ void ResetCameraPoseFloor()
 {
     camera.parameter.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
-        { 0.0f, 10.0f, 0.0f });   /* tvec */
+        { 0.0f, 10.0f, 0.0f }, true);   /* tvec (in world coordinate) */
 }
 
 void ResetCameraPoseWall()
 {
     camera.parameter.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
-        { 0.0f, 0.0f, 100.0f });   /* tvec */
+        { 0.0f, 0.0f, 100.0f }, true);   /* tvec (in world coordinate) */
 }
 
 void ResetCamera(int32_t width, int32_t height)
 {
     camera.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kFovDeg));
-    camera.parameter.dist_coeff = (cv::Mat_<float>(5, 1) << -0.1f, 0.01f, -0.005f, -0.001f, 0.0f);
+    camera.parameter.SetDist({ -0.1f, 0.01f, -0.005f, -0.001f, 0.0f });
     ResetCameraPoseFloor();
 }
 
@@ -106,6 +106,7 @@ static void loop_main()
             if (i % kPointNum != 0) {
                 cv::line(mat_output, image_point_list[i - 1], image_point_list[i], cv::Scalar(220, 0, 0));
             }
+            
             cv::circle(mat_output, image_point_list[i], 2, cv::Scalar(220, 0, 0));
             cv::putText(mat_output, std::to_string(i), image_point_list[i], 0, 0.4, cv::Scalar(0, 255, 0));
         }
@@ -158,6 +159,8 @@ static void loop_param()
         MAKE_GUI_SETTING_FLOAT(camera.parameter.dist_coeff.at<float>(2), "dist: p1", 0.00001f, "%.05Lf", -0.1f, 0.1f);
         MAKE_GUI_SETTING_FLOAT(camera.parameter.dist_coeff.at<float>(3), "dist: p2", 0.00001f, "%.05Lf", -0.1f, 0.1f);
         MAKE_GUI_SETTING_FLOAT(camera.parameter.dist_coeff.at<float>(4), "dist: k3", 0.00001f, "%.05Lf", -0.1f, 0.1f);
+
+        camera.parameter.UpdateNewCameraMatrix();
 
         cvui::text("Camera Parameter (external)");
         float temp_deg = Rad2Deg(camera.parameter.pitch());

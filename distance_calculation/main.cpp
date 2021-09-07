@@ -29,8 +29,12 @@ limitations under the License.
 #include "camera_model.h"
 
 /*** Macro ***/
+static constexpr char kInputFilename[] = RESOURCE_DIR"/dashcam_00.jpg";
 static constexpr char kWindowMain[] = "WindowMain";
 static constexpr char kWindowParam[] = "WindowParam";
+
+static constexpr int32_t kWidth = 1280;
+static constexpr int32_t kHeight = 720;
 static constexpr float kFovDeg = 130.0f;
 
 
@@ -43,31 +47,61 @@ void ResetCameraPose()
 {
     camera.parameter.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
-        { 0.0f, 1.0f, 0.0f });   /* tvec */
+        { 0.0f, 1.5f, 0.0f }, true);   /* tvec (in world coordinate) */
 }
 
 void ResetCamera(int32_t width, int32_t height)
 {
     camera.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kFovDeg));
-    camera.parameter.dist_coeff = (cv::Mat_<float>(5, 1) << -0.1f, 0.01f, -0.005f, -0.001f, 0.0f);
+    camera.parameter.SetDist({ -0.1f, 0.01f, -0.005f, -0.001f, 0.0f });
     ResetCameraPose();
 }
 
 
 static void loop_main(const cv::Mat& image_org)
 {
-    cv::Mat& image = image_org.clone();
+    cv::Mat image;
     cvui::context(kWindowMain);
-    for (const auto& point : selecting_point_list) {
-        cv::circle(image, point, 5, cv::Scalar(255, 0, 0), -1);
+    if (!image_org.empty()) {
+        image = image_org.clone();
+        for (const auto& point : selecting_point_list) {
+            cv::circle(image, point, 5, cv::Scalar(255, 0, 0), -1);
 
-        cv::Point3f object_point;
-        camera.ProjectImage2GroundPlane(point, object_point);
+            cv::Point3f object_point;
+            camera.ProjectImage2GroundPlane(point, object_point);
 
-        char text[64];
-        snprintf(text, sizeof(text), "%.1f, %.1f[m]", object_point.x, object_point.z);
-        cv::putText(image, text, point, cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
+            char text[64];
+            snprintf(text, sizeof(text), "%.1f, %.1f[m]", object_point.x, object_point.z);
+            cv::putText(image, text, point, cv::FONT_HERSHEY_SIMPLEX, 0.8, cv::Scalar(255, 0, 0), 2);
+        }
+    } else {
+        std::vector<cv::Point3f> object_point_list;
+        for (float x = -10; x <= 10; x += 1) {
+            for (float z = 0; z <= 20; z += 1) {
+                object_point_list.push_back(cv::Point3f(x, 0, z));
+            }
+        }
+        std::vector<cv::Point2f> image_point_list;
+        cv::projectPoints(object_point_list, camera.parameter.rvec, camera.parameter.tvec, camera.parameter.K, camera.parameter.dist_coeff, image_point_list);
+        image = cv::Mat(kHeight, kWidth, CV_8UC3, cv::Scalar(70, 70, 70));
+        for (int32_t i = 0; i < image_point_list.size(); i++) {
+            /* Draw calculated imate point */
+            cv::circle(image, image_point_list[i], 2, cv::Scalar(220, 0, 0), -1);
+
+            /* Re-convert image point to object poitn(world) */
+            cv::Point3f object_point;
+            camera.ProjectImage2GroundPlane(image_point_list[i], object_point);
+
+            /* draw to check */
+            char text[64];
+            snprintf(text, sizeof(text), "%.0f, %.0f", object_point_list[i].x, object_point_list[i].z);
+            cv::putText(image, text, image_point_list[i], 0, 0.4, cv::Scalar(0, 255, 0));
+            snprintf(text, sizeof(text), "%.0f, %.0f", object_point.x, object_point.z);
+            cv::putText(image, text, image_point_list[i] + cv::Point2f(0, 10), 0, 0.4, cv::Scalar(0, 255, 0));
+        }
     }
+
+    cv::line(image, cv::Point(0, camera.EstimateVanishmentY()), cv::Point(image.cols, camera.EstimateVanishmentY()), cv::Scalar(0, 0, 0), 1);
     cvui::imshow(kWindowMain, image);
 }
 
@@ -103,6 +137,7 @@ static void loop_param()
         cvui::text("Camera Parameter (Intrinsic)");
         MAKE_GUI_SETTING_FLOAT(camera.parameter.fx(), "Focal Length", 10.0f, "%.0Lf", 0.0f, 1000.0f);
         camera.parameter.fy() = camera.parameter.fx();
+        camera.parameter.UpdateNewCameraMatrix();
 
         cvui::text("Camera Parameter (Extrinsic)");
         MAKE_GUI_SETTING_FLOAT(camera.parameter.y(), "Height", 1.0f, "%.0Lf", 0.0f, 5.0f);
@@ -193,10 +228,12 @@ int main(int argc, char* argv[])
 
     cv::setMouseCallback(kWindowMain, CallbackMouseMain);
 
-    static const std::string image_path = RESOURCE_DIR"/dashcam_00.jpg";
-    cv::Mat image_org = cv::imread(image_path);
-
-    ResetCamera(image_org.cols, image_org.rows);
+    cv::Mat image_org = cv::imread(kInputFilename);
+    if (!image_org.empty()) {
+        ResetCamera(image_org.cols, image_org.rows);
+    } else {
+        ResetCamera(kWidth, kHeight);
+    }
 
     while (true) {
         loop_main(image_org);
