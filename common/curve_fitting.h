@@ -57,6 +57,33 @@ public:
         return true;
     }
 
+    template <typename T = int32_t>
+    static double ErrorAvgLinearRegression(const std::vector<cv::Point_<T>>& point_list, double a, double b)
+    {
+        double error = 0;
+        for (const auto& p : point_list) {
+            double y = p.y;
+            double y_est = a * p.x + b;
+            error += std::abs(y - y_est);
+        }
+
+        error /= point_list.size();
+        return error;
+    }
+
+    template <typename T = int32_t>
+    static double ErrorMaxLinearRegression(const std::vector<cv::Point_<T>>& point_list, double a, double b)
+    {
+        double error = 0;
+        for (const auto& p : point_list) {
+            double y = p.y;
+            double y_est = a * p.x + b;
+            error = std::max(error, std::abs(y - y_est));
+        }
+
+        return error;
+    }
+
     /* y = ax^2 + bx + c */
     /* point = (x, y) */
     template <typename T>
@@ -72,7 +99,7 @@ public:
         double sum_x3 = 0;
         double sum_x2 = 0;
         double sum_x1 = 0;
-        double sum_x0 = point_list.size();
+        double sum_x0 = static_cast<double>(point_list.size());
         double sum_xxy = 0;
         double sum_xy = 0;
         double sum_y = 0;
@@ -104,6 +131,33 @@ public:
         c = mat.at<double>(2);
 
         return true;
+    }
+
+    template <typename T = int32_t>
+    static double ErrorAvgQuadraticRegression(const std::vector<cv::Point_<T>>& point_list, double a, double b, double c)
+    {
+        double error = 0;
+        for (const auto& p : point_list) {
+            double y = p.y;
+            double y_est = a * p.x * p.x + b * p.x + c;
+            error += std::abs(y - y_est);
+        }
+
+        error /= point_list.size();
+        return error;
+    }
+
+    template <typename T = int32_t>
+    static double ErrorMaxQuadraticRegression(const std::vector<cv::Point_<T>>& point_list, double a, double b, double c)
+    {
+        double error = 0;
+        for (const auto& p : point_list) {
+            double y = p.y;
+            double y_est = a * p.x * p.x + b * p.x + c;
+            error = std::max(error, std::abs(y - y_est));
+        }
+
+        return error;
     }
 };
 

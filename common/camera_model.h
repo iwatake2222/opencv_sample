@@ -76,7 +76,6 @@ public:
         void SetIntrinsic(int32_t _width, int32_t _height, float focal_length) {
             width = _width;
             height = _height;
-            float f = focal_length;
             K = (cv::Mat_<float>(3, 3) <<
                 focal_length,            0,  width / 2.f,
                            0, focal_length, height / 2.f,
@@ -118,7 +117,7 @@ public:
     static float FocalLength(int32_t image_size, float fov)
     {
         /* (w/2) / f = tan(fov/2) */
-        return (image_size / 2) / std::tanf(Deg2Rad(fov / 2));
+        return (image_size / 2) / std::tan(Deg2Rad(fov / 2));
     }
 
     template <typename T = float>
@@ -228,6 +227,12 @@ public:
         float u = image_point_undistort[0].x;
         float v = image_point_undistort[0].y;
 
+        if (v < EstimateVanishmentY()) {
+            object_point.x = 999;
+            object_point.y = 999;
+            object_point.z = 999;
+            return;
+        }
 
         /*** Calculate point in ground plane (in world coordinate) ***/
         /* Main idea:*/
@@ -238,8 +243,8 @@ public:
         /*   Rinv * (s * Kinv * [u, v, 1] - t) = M */
         /* calculate s */
         /*   s * Rinv * Kinv * [u, v, 1] = M + R_inv * t */
-        /*      where, M = (X, Y, Z) and Y = camera_height(ground_plane) */
-        /*      so , we can solve left[1] = M[1](camera_height) */
+        /*      where, M = (X, Y, Z), and we assume Y = 0(ground_plane) */
+        /*      so , we can solve left[1] = R_inv * t[1](camera_height) */
 
         cv::Mat K = parameter.K;
         cv::Mat R = MakeRotateMat(Rad2Deg(parameter.pitch()), Rad2Deg(parameter.yaw()), Rad2Deg(parameter.roll()));
