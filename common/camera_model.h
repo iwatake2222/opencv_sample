@@ -123,11 +123,11 @@ public:
     template <typename T = float>
     static cv::Mat MakeRotateMat(T x_deg, T y_deg, T z_deg)
     {
-
         T x_rad = Deg2Rad(x_deg);
         T y_rad = Deg2Rad(y_deg);
         T z_rad = Deg2Rad(z_deg);
 #if 0
+        /* Rotation Matrix with Euler Angle */
         cv::Mat R_x = (cv::Mat_<T>(3, 3) <<
             1, 0, 0,
             0, std::cos(x_rad), -std::sin(x_rad),
@@ -145,6 +145,7 @@ public:
         
         cv::Mat R = R_z * R_x * R_y;
 #else
+        /* Rodrigues */
         cv::Mat r = (cv::Mat_<T>(3, 1) << x_rad, y_rad, z_rad);
         cv::Mat R;
         cv::Rodrigues(r, R);
@@ -175,7 +176,8 @@ public:
 
     void ProjectWorld2Image(const cv::Point3f& object_point, cv::Point2f& image_point)
     {
-        /* todo: the conversion result is diferent from cv::projectPoints when more than two angles changes */
+        /* the followings get exactly the same result */
+#if 1
         /*** Projection ***/
         /* s[u, v, 1] = K * [R t] * [M, 1]  */
         cv::Mat K = parameter.K;
@@ -208,6 +210,12 @@ public:
 
         image_point.x = uu * parameter.fx() + parameter.cx();
         image_point.y = vv * parameter.fy() + parameter.cy();
+#else
+        std::vector<cv::Point3f> object_point_list = { object_point };
+        std::vector<cv::Point2f> image_point_list;
+        cv::projectPoints(object_point_list, parameter.rvec, parameter.tvec, parameter.K, parameter.dist_coeff, image_point_list);
+        image_point = image_point_list[0];
+#endif
     }
 
     template <typename T = float>
