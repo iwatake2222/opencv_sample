@@ -56,6 +56,10 @@ https://user-images.githubusercontent.com/11009876/132087422-79d37de1-3ea4-476c-
     - https://github.com/opencv/opencv
     - Licensed under the Apache License, Version 2.0
     - Image files are copied
+- OpenCV Zoo
+    - https://github.com/opencv/opencv_zoo
+    - Licensed under the Apache License, Version 2.0
+    - Model files are copied
 - https://www.photo-ac.com
     - fisheye_00.jpg
 - YouTube
