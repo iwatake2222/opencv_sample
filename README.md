@@ -44,8 +44,10 @@ https://user-images.githubusercontent.com/11009876/132087422-79d37de1-3ea4-476c-
 ## dnn_face
 - Face Detection using YuNet
 - Head Pose Estimatino Using SolvePnP
+- Overlay icon with transparent mask
 
 ![00_doc/dnn_face.jpg](00_doc/dnn_face.jpg)
+![00_doc/dnn_face_mask.jpg](00_doc/dnn_face_mask.jpg)
 
 # License
 - Copyright 2021 iwatake2222
@@ -70,3 +72,5 @@ https://user-images.githubusercontent.com/11009876/132087422-79d37de1-3ea4-476c-
     - fisheye_00.jpg
 - YouTube
     - dashcam_00.jpg (Copyright Dashcam Roadshow 2020. https://www.youtube.com/watch?v=tTuUjnISt9s )
+- Others
+    - https://lovelive-as.bushimo.jp/wp-content/uploads/2019/09/chara_09_stage.png (https://lovelive-as.bushimo.jp/member/rina/ )

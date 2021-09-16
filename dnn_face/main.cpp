@@ -81,7 +81,7 @@ void EstimateHeadPose(cv::Mat& image, const FaceDetection::Landmark& landmark)
     std::vector<cv::Point3f> nose_end_point3D = { { 0.0f, 0.0f, 500.0f } };
     std::vector<cv::Point2f> nose_end_point2D;
     cv::projectPoints(nose_end_point3D, rvec, tvec, camera.parameter.K, camera.parameter.dist_coeff, nose_end_point2D);
-    cv::arrowedLine(image, face_image_point_list[0], nose_end_point2D[0], cv::Scalar(255, 0, 0), 2);
+    cv::arrowedLine(image, face_image_point_list[0], nose_end_point2D[0], cv::Scalar(0, 255, 0), 5);
 
     /* Calculate Euler Angle */
     cv::Mat R;
@@ -101,22 +101,47 @@ void EstimateHeadPose(cv::Mat& image, const FaceDetection::Landmark& landmark)
 
 
 #if 0
-    static cv::Mat image_mask = cv::imread(RESOURCE_DIR"/mask_rina.jpg");
+    static cv::Mat image_icon = cv::imread(RESOURCE_DIR"/mask_rina.png");
+    static cv::Mat image_icon_mask;
+    if (image_icon_mask.empty()) {
+        /* Generate mask image */
+        image_icon_mask = cv::Mat::zeros(image_icon.size(), CV_8UC3);
+        for (int32_t y = 0; y < image_icon.rows; y++) {
+            for (int32_t x = 0; x < image_icon.cols; x++) {
+                auto& val_icon = image_icon.at<cv::Vec3b>(y, x);
+                auto& val_mask = image_icon_mask.at<cv::Vec3b>(y, x);
+                if (val_icon[0] == 0 && val_icon[1] == 255 && val_icon[2] == 0) {   /* mask color is green */
+                    val_icon = cv::Vec3b(0, 0, 0);
+                    val_mask = cv::Vec3b(255, 255, 255);
+                } else {
+                    val_mask = cv::Vec3b(0, 0, 0);
+                }
+            }
+        }
+    }
+
     std::vector<cv::Point3f> object_point_list;
-    float aspect = static_cast<float>(image_mask.cols) / image_mask.rows;
-    float length = 500.0f;
-    object_point_list.push_back(cv::Point3f(-length * aspect, length, -150));
-    object_point_list.push_back(cv::Point3f(length * aspect, length, -150));
-    object_point_list.push_back(cv::Point3f(length * aspect, -length, -150));
-    object_point_list.push_back(cv::Point3f(-length * aspect, -length, -150));
+    float aspect = static_cast<float>(image_icon.cols) / image_icon.rows;
+    float length = 650.0f;
+    object_point_list.push_back(cv::Point3f(-length * aspect, length + 200, -150));
+    object_point_list.push_back(cv::Point3f(length * aspect, length + 200, -150));
+    object_point_list.push_back(cv::Point3f(length * aspect, -length + 200, -150));
+    object_point_list.push_back(cv::Point3f(-length * aspect, -length + 200, -150));
     CameraModel::RotateObject(Rad2Deg(rvec.ptr<float>()[0]), Rad2Deg(rvec.ptr<float>()[1]), Rad2Deg(rvec.ptr<float>()[2]), object_point_list);
 
     std::vector<cv::Point2f> image_point_list;
     cv::projectPoints(object_point_list, camera.parameter.rvec, tvec, camera.parameter.K, camera.parameter.dist_coeff, image_point_list);
 
-    cv::Point2f pts1[] = { cv::Point2f(0, 0), cv::Point2f(image_mask.cols - 1.0f, 0) , cv::Point2f(image_mask.cols - 1.0f, image_mask.rows - 1.0f) , cv::Point2f(0, image_mask.rows - 1.0f) };
+    cv::Point2f pts1[] = { cv::Point2f(0, 0), cv::Point2f(image_icon.cols - 1.0f, 0) , cv::Point2f(image_icon.cols - 1.0f, image_icon.rows - 1.0f) , cv::Point2f(0, image_icon.rows - 1.0f) };
     cv::Mat mat_affine = cv::getPerspectiveTransform(pts1, &image_point_list[0]);
-    cv::warpPerspective(image_mask, image, mat_affine, image.size(), cv::INTER_LINEAR, cv::BORDER_TRANSPARENT);
+    
+    /* overlay icon with transparent mask */
+    cv::Mat image_mask(image.size(), CV_8UC3);
+    cv::warpPerspective(image_icon_mask, image_mask, mat_affine, image_mask.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(255, 255, 255));
+    cv::Mat image_temp(image.size(), CV_8UC3);
+    cv::warpPerspective(image_icon, image_temp, mat_affine, image_temp.size(), cv::INTER_LINEAR, cv::BORDER_CONSTANT, cv::Scalar(0, 0, 0));
+    cv::bitwise_and(image_mask, image, image);
+    cv::bitwise_or(image_temp, image, image);
 #endif
 }
 
@@ -162,7 +187,7 @@ int main(int argc, char *argv[])
         for (int32_t i = 0; i < static_cast<int32_t>(bbox_list.size()); i++) {
             const auto& bbox = bbox_list[i];
             const auto& landmark = landmark_list[i];
-            cv::rectangle(image_input, bbox, cv::Scalar(255, 0, 0));
+            cv::rectangle(image_input, bbox, cv::Scalar(255, 0, 0), 3);
             int32_t num = 0;
             for (const auto& p : landmark) {
                 cv::circle(image_input, p, 3, cv::Scalar(255, 0, 0), 2);
