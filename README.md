@@ -38,8 +38,14 @@ https://user-images.githubusercontent.com/11009876/132087422-79d37de1-3ea4-476c-
 
 ## distance_calculation
 - Distance calculation on ground plane
+
 ![00_doc/distance_calculation.jpg](00_doc/distance_calculation.jpg)
 
+## dnn_face
+- Face Detection using YuNet
+- Head Pose Estimatino Using SolvePnP
+
+![00_doc/dnn_face.jpg](00_doc/dnn_face.jpg)
 
 # License
 - Copyright 2021 iwatake2222

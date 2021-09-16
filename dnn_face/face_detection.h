@@ -30,7 +30,7 @@ public:
     typedef std::array<cv::Point, 5> Landmark;
 
 private:
-    static constexpr int32_t kModelInputWidth = 256;
+    static constexpr int32_t kModelInputWidth = 512;
     static constexpr float kThresholdConf = 0.4f;
     static constexpr float kThresholdNms = 0.3f;
     const std::vector<float> variance_list = { 0.1f, 0.2f };

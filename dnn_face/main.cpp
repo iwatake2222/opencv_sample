@@ -46,15 +46,17 @@ void EstimateHeadPose(cv::Mat& image, const FaceDetection::Landmark& landmark)
     /* reference: https://github.com/spmallick/learnopencv/blob/master/HeadPose/headPose.cpp */
     static const std::vector<cv::Point3f> face_object_point_list = {
         { 0.0f, 0.0f, 0.0f },           /* nose */
-        { 0.0f, 0.0f, 0.0f },           /* nose */
-        { -225.0f, 170.0f, -135.0f },   /* left eye */
         { -225.0f, 170.0f, -135.0f },   /* left eye */
         { 225.0f, 170.0f, -135.0f },    /* right eye */
-        { 225.0f, 170.0f, -135.0f },    /* right eye */
-        { -150.0f, -150.0f, -125.0f },  /* left lip */
         { -150.0f, -150.0f, -125.0f },  /* left lip */
         { 150.0f, -150.0f, -125.0f },   /* right lip */
-        { 150.0f, -150.0f, -125.0f },   /* right lip */
+    };
+    static const std::vector<cv::Point3f> face_object_point_for_pnp_list = {    /* increase point num */
+        face_object_point_list[0], face_object_point_list[0],
+        face_object_point_list[1], face_object_point_list[1],
+        face_object_point_list[2], face_object_point_list[2],
+        face_object_point_list[3], face_object_point_list[3],
+        face_object_point_list[4], face_object_point_list[4],
     };
 
     std::vector<cv::Point2f> face_image_point_list;
@@ -71,12 +73,12 @@ void EstimateHeadPose(cv::Mat& image, const FaceDetection::Landmark& landmark)
 
     cv::Mat rvec = cv::Mat_<float>(3, 1);
     cv::Mat tvec = cv::Mat_<float>(3, 1);
-    cv::solvePnP(face_object_point_list, face_image_point_list, camera.parameter.K, camera.parameter.dist_coeff, rvec, tvec);
+    cv::solvePnP(face_object_point_for_pnp_list, face_image_point_list, camera.parameter.K, camera.parameter.dist_coeff, rvec, tvec, false, cv::SOLVEPNP_ITERATIVE);
     char text[128];
     snprintf(text, sizeof(text), "Pitch = %-+4.0f, Yaw = %-+4.0f, Roll = %-+4.0f", Rad2Deg(rvec.at<float>(0, 0)), Rad2Deg(rvec.at<float>(1, 0)), Rad2Deg(rvec.at<float>(2, 0)));
     CommonHelper::DrawText(image, text, cv::Point(10, 10), 0.7, 3, cv::Scalar(0, 0, 0), cv::Scalar(255, 255, 255), false);
     
-    std::vector<cv::Point3f> nose_end_point3D = { { 0.0f, 0.0f, 200.0f } };
+    std::vector<cv::Point3f> nose_end_point3D = { { 0.0f, 0.0f, 500.0f } };
     std::vector<cv::Point2f> nose_end_point2D;
     cv::projectPoints(nose_end_point3D, rvec, tvec, camera.parameter.K, camera.parameter.dist_coeff, nose_end_point2D);
     cv::arrowedLine(image, face_image_point_list[0], nose_end_point2D[0], cv::Scalar(255, 0, 0), 2);
@@ -96,6 +98,26 @@ void EstimateHeadPose(cv::Mat& image, const FaceDetection::Landmark& landmark)
     double roll = euler_angle_deg_list.at<double>(2, 0);
     snprintf(text, sizeof(text), "X = %-+4.0f, Y = %-+4.0f, Z = %-+4.0f", pitch, yaw, roll);
     CommonHelper::DrawText(image, text, cv::Point(10, 40), 0.7, 3, cv::Scalar(0, 0, 0), cv::Scalar(255, 255, 255), false);
+
+
+#if 0
+    static cv::Mat image_mask = cv::imread(RESOURCE_DIR"/mask_rina.jpg");
+    std::vector<cv::Point3f> object_point_list;
+    float aspect = static_cast<float>(image_mask.cols) / image_mask.rows;
+    float length = 500.0f;
+    object_point_list.push_back(cv::Point3f(-length * aspect, length, -150));
+    object_point_list.push_back(cv::Point3f(length * aspect, length, -150));
+    object_point_list.push_back(cv::Point3f(length * aspect, -length, -150));
+    object_point_list.push_back(cv::Point3f(-length * aspect, -length, -150));
+    CameraModel::RotateObject(Rad2Deg(rvec.ptr<float>()[0]), Rad2Deg(rvec.ptr<float>()[1]), Rad2Deg(rvec.ptr<float>()[2]), object_point_list);
+
+    std::vector<cv::Point2f> image_point_list;
+    cv::projectPoints(object_point_list, camera.parameter.rvec, tvec, camera.parameter.K, camera.parameter.dist_coeff, image_point_list);
+
+    cv::Point2f pts1[] = { cv::Point2f(0, 0), cv::Point2f(image_mask.cols - 1.0f, 0) , cv::Point2f(image_mask.cols - 1.0f, image_mask.rows - 1.0f) , cv::Point2f(0, image_mask.rows - 1.0f) };
+    cv::Mat mat_affine = cv::getPerspectiveTransform(pts1, &image_point_list[0]);
+    cv::warpPerspective(image_mask, image, mat_affine, image.size(), cv::INTER_LINEAR, cv::BORDER_TRANSPARENT);
+#endif
 }
 
 int main(int argc, char *argv[])
