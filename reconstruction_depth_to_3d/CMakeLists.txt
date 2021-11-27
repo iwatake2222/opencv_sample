@@ -1,0 +1,2 @@
+add_executable(reconstruction_depth_to_3d main.cpp depth_engine.cpp depth_engine.h)
+target_link_libraries(reconstruction_depth_to_3d common)

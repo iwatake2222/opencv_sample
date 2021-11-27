@@ -179,7 +179,7 @@ public:
         /* the followings get exactly the same result */
 #if 1
         /*** Projection ***/
-        /* s[u, v, 1] = K * [R t] * [M, 1]  */
+        /* s[u, v, 1] = K * [R t] * [M, 1] = K * M_from_cam */
         cv::Mat K = parameter.K;
         cv::Mat R = MakeRotateMat(Rad2Deg(parameter.pitch()), Rad2Deg(parameter.yaw()), Rad2Deg(parameter.roll()));
         cv::Mat Rt = (cv::Mat_<float>(3, 4) <<
@@ -189,27 +189,35 @@ public:
 
         cv::Mat M = (cv::Mat_<float>(4, 1) << object_point.x, object_point.y, object_point.z, 1);
 
-        cv::Mat UV = K * Rt * M;
+        cv::Mat M_from_cam = Rt * M;
 
-        float u = UV.at<float>(0);
-        float v = UV.at<float>(1);
-        float s = UV.at<float>(2);
-        u /= s;
-        v /= s;
-        /*** Undistort ***/
-        float uu = (u - parameter.cx()) / parameter.fx();  /* from optical center*/
-        float vv = (v - parameter.cy()) / parameter.fy();  /* from optical center*/
-        float r2 = uu * uu + vv * vv;
-        float r4 = r2 * r2;
-        float k1 = parameter.dist_coeff.at<float>(0);
-        float k2 = parameter.dist_coeff.at<float>(1);
-        float p1 = parameter.dist_coeff.at<float>(3);
-        float p2 = parameter.dist_coeff.at<float>(4);
-        uu = uu + uu * (k1 * r2 + k2 * r4 /*+ k3 * r6 */) + (2 * p1 * uu * vv) + p2 * (r2 + 2 * uu * uu);
-        vv = vv + vv * (k1 * r2 + k2 * r4 /*+ k3 * r6 */) + (2 * p2 * uu * vv) + p1 * (r2 + 2 * vv * vv);
+        if (M_from_cam.at<float>(2) >= 0 ) {
+            /* Do projection for the obects located at the front of the camera */
+            cv::Mat UV = K * M_from_cam;
 
-        image_point.x = uu * parameter.fx() + parameter.cx();
-        image_point.y = vv * parameter.fy() + parameter.cy();
+            float u = UV.at<float>(0);
+            float v = UV.at<float>(1);
+            float s = UV.at<float>(2);
+            u /= s;
+            v /= s;
+            /*** Undistort ***/
+            float uu = (u - parameter.cx()) / parameter.fx();  /* from optical center*/
+            float vv = (v - parameter.cy()) / parameter.fy();  /* from optical center*/
+            float r2 = uu * uu + vv * vv;
+            float r4 = r2 * r2;
+            float k1 = parameter.dist_coeff.at<float>(0);
+            float k2 = parameter.dist_coeff.at<float>(1);
+            float p1 = parameter.dist_coeff.at<float>(3);
+            float p2 = parameter.dist_coeff.at<float>(4);
+            uu = uu + uu * (k1 * r2 + k2 * r4 /*+ k3 * r6 */) + (2 * p1 * uu * vv) + p2 * (r2 + 2 * uu * uu);
+            vv = vv + vv * (k1 * r2 + k2 * r4 /*+ k3 * r6 */) + (2 * p2 * uu * vv) + p1 * (r2 + 2 * vv * vv);
+
+            image_point.x = uu * parameter.fx() + parameter.cx();
+            image_point.y = vv * parameter.fy() + parameter.cy();
+        } else {
+            image_point.x = -1;
+            image_point.y = -1;
+        }
 #else
         std::vector<cv::Point3f> object_point_list = { object_point };
         std::vector<cv::Point2f> image_point_list;
@@ -279,6 +287,28 @@ public:
 
         //PRINT_MAT_FLOAT(TEMP, 3);
     }
+
+    /* todo */
+    void ProjectImage2PosInCamera(const cv::Point2f& image_point, float Z, cv::Point3f& object_point)
+    {
+        /*** Undistort image point ***/
+        std::vector<cv::Point2f> original_uv{ image_point };
+        std::vector<cv::Point2f> image_point_undistort;
+        cv::undistortPoints(original_uv, image_point_undistort, parameter.K, parameter.dist_coeff, parameter.K);    /* don't use K_new */
+        float u = image_point_undistort[0].x;
+        float v = image_point_undistort[0].y;
+
+        float x_from_center = parameter.cx() - u;
+        float y_from_center = parameter.cy() - v;
+        float X = Z * x_from_center / -parameter.fx();
+        float Y = Z * y_from_center / -parameter.fy();
+
+
+        object_point.x = X;
+        object_point.y = Y;
+        object_point.z = Z;
+    }
+
 
     /* tan(theta) = delta / f */
     float EstimatePitch(float vanishment_y)
