@@ -32,7 +32,7 @@ limitations under the License.
 
 /*** Macro ***/
 static constexpr char kInputImageFilename[] = RESOURCE_DIR"/lena.jpg";
-static constexpr char kModelFilename[] = RESOURCE_DIR"/face_detection_yunet.onnx";
+static constexpr char kModelFilename[] = RESOURCE_DIR"/model/face_detection_yunet.onnx";
 static constexpr float kFovDeg = 60.0f;
 
 /*** Global variable ***/
