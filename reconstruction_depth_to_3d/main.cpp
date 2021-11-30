@@ -23,6 +23,7 @@ limitations under the License.
 #include <array>
 #include <numeric>
 #include <algorithm>
+#include <chrono>
 
 #include <opencv2/opencv.hpp>
 
@@ -40,32 +41,27 @@ static constexpr float   kFovDeg = 60.0f;
 static CameraModel camera_2d_to_3d;
 static CameraModel camera_3d_to_2d;
 
+/*** Function ***/
 void initialize_camera(int32_t width, int32_t height)
 {
     camera_2d_to_3d.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kFovDeg));
     camera_2d_to_3d.parameter.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
     camera_2d_to_3d.parameter.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
-        { 0.0f, 0.0f, 0.0f }, true);   /* tvec (in world coordinate) */
+        { 0.0f, 0.0f, 0.0f }, true);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
+                                       /* tvec must be zero, so that calculated Mc(Location in camera cooridinate) becomes the same as Mw(location in world coordinate), and can be used to convert from 3D to 2D later */
 
     camera_3d_to_2d.parameter.SetIntrinsic(kWidth, kHeight, CameraModel::FocalLength(kWidth, kFovDeg));
     camera_3d_to_2d.parameter.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
-    //camera_3d_to_2d.parameter.SetDist({ -0.1f, 0.01f, -0.005f, -0.001f, 0.0f });
-    //camera_3d_to_2d.parameter.SetExtrinsic(
-    //    { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
-    //    { 0.0f, 0.0f, 0.0f }, true);   /* tvec (in world coordinate) */
-
     camera_3d_to_2d.parameter.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
-        { 0.0f, 0.0f, 0.0f }, true);   /* tvec (in world coordinate) */
+        { 0.0f, 0.0f, 0.0f }, true);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
 
 }
 
-/*** Function ***/
-
 static void CallbackMouseMain(int32_t event, int32_t x, int32_t y, int32_t flags, void* userdata)
 {
-    static constexpr float kIncAnglePerPx = 0.01f;
+    static constexpr float kIncAnglePerPx = 0.1f;
     static constexpr int32_t kInvalidValue = -99999;
     static cv::Point s_drag_previous_point = { kInvalidValue, kInvalidValue };
     if (event == cv::EVENT_LBUTTONUP) {
@@ -76,65 +72,61 @@ static void CallbackMouseMain(int32_t event, int32_t x, int32_t y, int32_t flags
         s_drag_previous_point.y = y;
     } else {
         if (s_drag_previous_point.x != kInvalidValue) {
-            camera_3d_to_2d.parameter.yaw() += kIncAnglePerPx * (x - s_drag_previous_point.x);
-            camera_3d_to_2d.parameter.pitch() -= kIncAnglePerPx * (y - s_drag_previous_point.y);
+            float delta_yaw = kIncAnglePerPx * (x - s_drag_previous_point.x);
+            float pitch_delta = -kIncAnglePerPx * (y - s_drag_previous_point.y);
+            camera_3d_to_2d.parameter.RotateCameraAngle(pitch_delta, delta_yaw, 0);
             s_drag_previous_point.x = x;
             s_drag_previous_point.y = y;
         }
-        camera_3d_to_2d.parameter.yaw() = (std::min)(Deg2Rad(90.0f), (std::max)(camera_3d_to_2d.parameter.yaw(), Deg2Rad(-90.0f)));
-        camera_3d_to_2d.parameter.pitch() = (std::min)(Deg2Rad(90.0f), (std::max)(camera_3d_to_2d.parameter.pitch(), Deg2Rad(-90.0f)));
-
-        /* todo: rotate oi camera coordinate */
     }
 }
 
-
 static void TreatKeyInputMain(int32_t key)
 {
-    static constexpr float kIncPosPerFrame = 20.f;
+    static constexpr float kIncPosPerFrame = 10.0f;
     key &= 0xFF;
     switch (key) {
     case 'w':
-        camera_3d_to_2d.parameter.z() -= kIncPosPerFrame;
+        camera_3d_to_2d.parameter.MoveCameraPos(0, 0, kIncPosPerFrame, false);
         break;
     case 'W':
-        camera_3d_to_2d.parameter.z() -= kIncPosPerFrame * 3;
+        camera_3d_to_2d.parameter.MoveCameraPos(0, 0, kIncPosPerFrame, true);
         break;
     case 's':
-        camera_3d_to_2d.parameter.z() += kIncPosPerFrame;
+        camera_3d_to_2d.parameter.MoveCameraPos(0, 0, -kIncPosPerFrame, false);
         break;
     case 'S':
-        camera_3d_to_2d.parameter.z() += kIncPosPerFrame * 3;
+        camera_3d_to_2d.parameter.MoveCameraPos(0, 0, -kIncPosPerFrame, true);
         break;
     case 'a':
-        camera_3d_to_2d.parameter.x() += kIncPosPerFrame;
+        camera_3d_to_2d.parameter.MoveCameraPos(-kIncPosPerFrame, 0, 0, false);
         break;
     case 'A':
-        camera_3d_to_2d.parameter.x() += kIncPosPerFrame * 3;
+        camera_3d_to_2d.parameter.MoveCameraPos(-kIncPosPerFrame, 0, 0, true);
         break;
     case 'd':
-        camera_3d_to_2d.parameter.x() -= kIncPosPerFrame;
+        camera_3d_to_2d.parameter.MoveCameraPos(kIncPosPerFrame, 0, 0, false);
         break;
     case 'D':
-        camera_3d_to_2d.parameter.x() -= kIncPosPerFrame * 3;
+        camera_3d_to_2d.parameter.MoveCameraPos(kIncPosPerFrame, 0, 0, true);
         break;
     case 'z':
-        camera_3d_to_2d.parameter.y() += kIncPosPerFrame;
+        camera_3d_to_2d.parameter.MoveCameraPos(0, -kIncPosPerFrame, 0, false);
         break;
     case 'Z':
-        camera_3d_to_2d.parameter.y() += kIncPosPerFrame * 3;
+        camera_3d_to_2d.parameter.MoveCameraPos(0, -kIncPosPerFrame, 0, true);
         break;
     case 'x':
-        camera_3d_to_2d.parameter.y() -= kIncPosPerFrame;
+        camera_3d_to_2d.parameter.MoveCameraPos(0, kIncPosPerFrame, 0, false);
         break;
     case 'X':
-        camera_3d_to_2d.parameter.y() -= kIncPosPerFrame * 3;
+        camera_3d_to_2d.parameter.MoveCameraPos(0, kIncPosPerFrame, 0, true);
         break;
     case 'q':
-        camera_3d_to_2d.parameter.roll() += 0.1f;
+        camera_3d_to_2d.parameter.RotateCameraAngle(0, 0, 2.0f);
         break;
     case 'e':
-        camera_3d_to_2d.parameter.roll() -= 0.1f;
+        camera_3d_to_2d.parameter.RotateCameraAngle(0, 0, -2.0f);
         break;
     }
 }
@@ -148,8 +140,6 @@ static bool CheckIfPointInArea(const cv::Point& p, const cv::Size& r)
 
 int main(int argc, char* argv[])
 {
-    
-
     /* Initialize Model */
     DepthEngine depth_engine;
     depth_engine.Initialize("");
@@ -161,50 +151,52 @@ int main(int argc, char* argv[])
         return -1;
     }
 
-    /* Process for each frame */
-    int32_t frame_cnt = 0;
-    for (frame_cnt = 0; cap.isOpened() || frame_cnt < 1 || true; frame_cnt++) { // todo
-        /* Read image */
-        cv::Mat image_input;
-        if (cap.isOpened()) {
-            cap.read(image_input);
-        } else {
-            image_input = cv::imread(input_name);
-        }
-        if (image_input.empty()) break;
+    /* Read image */
+    cv::Mat image_input;
+    if (cap.isOpened()) {
+        cap.read(image_input);
+    } else {
+        image_input = cv::imread(input_name);
+    }
+    if (image_input.empty()) return -1;
 
-        cv::resize(image_input, image_input, cv::Size(), 0.5, 0.5); // todo
+    cv::resize(image_input, image_input, cv::Size(), 0.5, 0.5);
 
-        if (frame_cnt == 0) initialize_camera(image_input.cols, image_input.rows);
+    initialize_camera(image_input.cols, image_input.rows);
 
-        /* Detect face */
-        cv::Mat mat_depth;
-        depth_engine.Process(image_input, mat_depth);
+    /* Estimate depth */
+    cv::Mat mat_depth;
+    depth_engine.Process(image_input, mat_depth);
 
-        /* Draw Result */
+    while(true) {
+        /* Draw depth */
         cv::Mat image_depth;
         //cv::applyColorMap(mat_depth, image_depth, cv::COLORMAP_JET);
         image_depth = mat_depth;
         cv::resize(image_depth, image_depth, image_input.size());
 
-        std::vector<cv::Point3f> object_point_list;
-        for (int32_t y = 0; y < image_depth.rows; y+=1) {
-            for (int32_t x = 0; x < image_depth.cols; x+=1) {
-                cv::Point3f object_point;
-                float Z = image_depth.at<uint8_t>(cv::Point(x, y));
-                camera_2d_to_3d.ProjectImage2PosInCamera(cv::Point2f(x, y), Z, object_point);
-                object_point_list.push_back(object_point);
-                //printf("%d %d, %.3f, %.3f, %.3f\n", x, y, object_point.x, object_point.y, object_point.z);
+        /* Convert px,py,depth(Zc) -> Xc,Yc,Zc(in camera_2d_to_3d)(=Xw,Yw,Zw) */
+        static std::vector<cv::Point2f> image_point_in_original_image_list;
+        if (image_point_in_original_image_list.size() == 0) {   /* initialize only once */
+            for (int32_t y = 0; y < image_depth.rows; y += 1) {
+                for (int32_t x = 0; x < image_depth.cols; x += 1) {
+                    image_point_in_original_image_list.push_back(cv::Point2f(x, y));
+                }
             }
         }
-
-        std::vector<cv::Point2f> image_point_list;
-        //cv::projectPoints(object_point_list, camera_3d_to_2d.parameter.rvec, camera_3d_to_2d.parameter.tvec, camera_3d_to_2d.parameter.K, camera_3d_to_2d.parameter.dist_coeff, image_point_list);
-        for (auto& p : object_point_list) {
-            cv::Point2f image_point;
-            camera_3d_to_2d.ProjectWorld2Image(p, image_point);
-            image_point_list.push_back(image_point);
+        std::vector<float> depth_list;
+        for (int32_t y = 0; y < image_depth.rows; y += 1) {
+            for (int32_t x = 0; x < image_depth.cols; x += 1) {
+                float Z = image_depth.at<uint8_t>(cv::Point(x, y));
+                depth_list.push_back(Z);
+            }
         }
+        std::vector<cv::Point3f> object_point_list;
+        camera_2d_to_3d.ProjectImage2PosInCamera(image_point_in_original_image_list, depth_list, object_point_list);
+
+        /* Project 3D to 2D(new image) */
+        std::vector<cv::Point2f> image_point_list;
+        camera_3d_to_2d.ProjectWorld2Image(object_point_list, image_point_list);
 
         /* Draw the result */
         cv::Mat mat_output = cv::Mat(kHeight, kWidth, CV_8UC3, cv::Scalar(0, 0, 0));
@@ -218,9 +210,8 @@ int main(int argc, char* argv[])
         cv::imshow("Depth", image_depth);
         cv::imshow("Reconstruction", mat_output);
         
-        
         int32_t key = cv::waitKey(1);
-        if (key == 'q') break;
+        if (key == 27) break;   /* ESC to quit */
         TreatKeyInputMain(key);
         cv::setMouseCallback("Reconstruction", CallbackMouseMain);
     }

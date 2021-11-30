@@ -26,6 +26,9 @@ limitations under the License.
 #include <array>
 
 #include <opencv2/opencv.hpp>
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
 #ifndef M_PI
 #define M_PI 3.141592653f
@@ -252,6 +255,14 @@ public:
         }
     }
 
+    template <typename T = float>
+    static void PRINT_MAT_FLOAT(const cv::Mat& mat, int32_t size)
+    {
+        for (int32_t i = 0; i < size; i++) {
+            printf("%d: %.3f\n", i, mat.at<T>(i));
+        }
+    }
+
 
     void ProjectWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
     {
@@ -267,6 +278,10 @@ public:
             R.at<float>(6), R.at<float>(7), R.at<float>(8), parameter.z());
 
         image_point_list.resize(object_point_list.size());
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (int32_t i = 0; i < object_point_list.size(); i++) {
             const auto& object_point = object_point_list[i];
             auto& image_point = image_point_list[i];
@@ -287,8 +302,8 @@ public:
             v /= s;
 
             if (parameter.dist_coeff.empty() || parameter.dist_coeff.at<float>(0) == 0) {
-                image_point.x = u * parameter.fx() + parameter.cx();
-                image_point.y = v * parameter.fy() + parameter.cy();
+                image_point.x = u;
+                image_point.y = v;
             } else {
                 /*** Distort ***/
                 float uu = (u - parameter.cx()) / parameter.fx();  /* from optical center*/
@@ -310,30 +325,9 @@ public:
 #endif
     }
 
-    template <typename T = float>
-    static void PRINT_MAT_FLOAT(const cv::Mat& mat, int32_t size)
+
+    void ProjectImage2GroundPlane(const std::vector<cv::Point2f>& image_point_list, std::vector<cv::Point3f>& object_point_list)
     {
-        for (int32_t i = 0; i < size; i++) {
-            printf("%d: %.3f\n", i, mat.at<T>(i));
-        }
-    }
-
-    void ProjectImage2GroundPlane(const cv::Point2f& image_point, cv::Point3f& object_point)
-    {
-        /*** Undistort image point ***/
-        std::vector<cv::Point2f> original_uv{ image_point };
-        std::vector<cv::Point2f> image_point_undistort;
-        cv::undistortPoints(original_uv, image_point_undistort, parameter.K, parameter.dist_coeff, parameter.K);    /* don't use K_new */
-        float u = image_point_undistort[0].x;
-        float v = image_point_undistort[0].y;
-
-        if (v < EstimateVanishmentY()) {
-            object_point.x = 999;
-            object_point.y = 999;
-            object_point.z = 999;
-            return;
-        }
-
         /*** Calculate point in ground plane (in world coordinate) ***/
         /* Main idea:*/
         /*   s * [u, v, 1] = K * [R t] * [M, 1]  */
@@ -346,51 +340,84 @@ public:
         /*      where, M = (X, Y, Z), and we assume Y = 0(ground_plane) */
         /*      so , we can solve left[1] = R_inv * t[1](camera_height) */
 
+        if (image_point_list.size() == 0) return;
+
         cv::Mat K = parameter.K;
         cv::Mat R = MakeRotateMat(Rad2Deg(parameter.pitch()), Rad2Deg(parameter.yaw()), Rad2Deg(parameter.roll()));
-
         cv::Mat K_inv;
         cv::invert(K, K_inv);
         cv::Mat R_inv;
         cv::invert(R, R_inv);
         cv::Mat t = parameter.tvec;
-        cv::Mat UV = (cv::Mat_<float>(3, 1) << u, v, 1);
 
-        /* calculate s */
-        cv::Mat LEFT_WO_S = R_inv * K_inv * UV;
-        cv::Mat RIGHT_WO_M = R_inv * t;         /* no need to add M because M[1] = 0 (ground plane)*/
-        float s = RIGHT_WO_M.at<float>(1) / LEFT_WO_S.at<float>(1);
+        /*** Undistort image point ***/
+        std::vector<cv::Point2f> image_point_undistort;
+        if (parameter.dist_coeff.empty() || parameter.dist_coeff.at<float>(0) == 0) {
+            image_point_undistort = image_point_list;
+        } else {
+            cv::undistortPoints(image_point_list, image_point_undistort, parameter.K, parameter.dist_coeff, parameter.K);    /* don't use K_new */
+        }
 
-        /* calculate M */
-        cv::Mat TEMP = R_inv * (s * K_inv * UV - t);
+        object_point_list.resize(image_point_list.size());
+        for (int32_t i = 0; i < object_point_list.size(); i++) {
+            const auto& image_point = image_point_list[i];
+            auto& object_point = object_point_list[i];
 
-        object_point.x = TEMP.at<float>(0);
-        object_point.y = TEMP.at<float>(1);
-        object_point.z = TEMP.at<float>(2);
-        if (object_point.z < 0) object_point.z = 999;
+            float u = image_point_undistort[i].x;
+            float v = image_point_undistort[i].y;
+            if (v < EstimateVanishmentY()) {
+                object_point.x = 999;
+                object_point.y = 999;
+                object_point.z = 999;
+                continue;
+            }
 
-        //PRINT_MAT_FLOAT(TEMP, 3);
+            cv::Mat UV = (cv::Mat_<float>(3, 1) << u, v, 1);
+
+            /* calculate s */
+            cv::Mat LEFT_WO_S = R_inv * K_inv * UV;
+            cv::Mat RIGHT_WO_M = R_inv * t;         /* no need to add M because M[1] = 0 (ground plane)*/
+            float s = RIGHT_WO_M.at<float>(1) / LEFT_WO_S.at<float>(1);
+
+            /* calculate M */
+            cv::Mat TEMP = R_inv * (s * K_inv * UV - t);
+
+            object_point.x = TEMP.at<float>(0);
+            object_point.y = TEMP.at<float>(1);
+            object_point.z = TEMP.at<float>(2);
+            if (object_point.z < 0) object_point.z = 999;
+        }
     }
 
-    /* todo */
-    void ProjectImage2PosInCamera(const cv::Point2f& image_point, float Z, cv::Point3f& object_point)
+    void ProjectImage2PosInCamera(const std::vector<cv::Point2f>& image_point_list, const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
     {
+        if (image_point_list.size() == 0) return;
+
         /*** Undistort image point ***/
-        std::vector<cv::Point2f> original_uv{ image_point };
         std::vector<cv::Point2f> image_point_undistort;
-        cv::undistortPoints(original_uv, image_point_undistort, parameter.K, parameter.dist_coeff, parameter.K);    /* don't use K_new */
-        float u = image_point_undistort[0].x;
-        float v = image_point_undistort[0].y;
+        if (parameter.dist_coeff.empty() || parameter.dist_coeff.at<float>(0) == 0) {
+            image_point_undistort = image_point_list;
+        } else {
+            cv::undistortPoints(image_point_list, image_point_undistort, parameter.K, parameter.dist_coeff, parameter.K);    /* don't use K_new */
+        }
 
-        float x_from_center = parameter.cx() - u;
-        float y_from_center = parameter.cy() - v;
-        float X = Z * x_from_center / -parameter.fx();
-        float Y = Z * y_from_center / -parameter.fy();
+        object_point_list.resize(image_point_list.size());
+        for (int32_t i = 0; i < object_point_list.size(); i++) {
+            const auto& image_point = image_point_list[i];
+            const auto& Zc = z_list[i];
+            auto& object_point = object_point_list[i];
 
+            float u = image_point_undistort[i].x;
+            float v = image_point_undistort[i].y;
 
-        object_point.x = X;
-        object_point.y = Y;
-        object_point.z = Z;
+            float x_from_center = u - parameter.cx();
+            float y_from_center = v - parameter.cy();
+            float Xc = Zc * x_from_center / parameter.fx();
+            float Yc = Zc * y_from_center / parameter.fy();
+            object_point.x = Xc;
+            object_point.y = Yc;
+            object_point.z = Zc;
+        }
     }
 
 

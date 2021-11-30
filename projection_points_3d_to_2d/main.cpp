@@ -51,16 +51,16 @@ void ResetCameraPoseFloor()
 {
     camera.parameter.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
-        //{ 0.0f, 10.0f, 0.0f }, false);   /* tvec (Ow - Oc in camera coordinate. Y+ = down) */
-        { 0.0f, -10.0f, 0.0f }, true);   /* tvec (Oc - Ow in world coordinate. Y+ = down) */
+        //{ 0.0f, 10.0f, 0.0f }, false);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
+        { 0.0f, -10.0f, 0.0f }, true);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
 }
 
 void ResetCameraPoseWall()
 {
     camera.parameter.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
-        //{ 0.0f, 0.0f, 100.0f }, false);   /* tvec (Ow - Oc in camera coordinate. Z+ = far) */
-        { 0.0f, 0.0f, -100.0f }, true);   /* tvec (Oc - Ow in world coordinate. Z+ = far) */
+        //{ 0.0f, 0.0f, 100.0f }, false);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
+        { 0.0f, 0.0f, -100.0f }, true);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
 }
 
 void ResetCamera(int32_t width, int32_t height)
@@ -210,7 +210,6 @@ static void CallbackMouseMain(int32_t event, int32_t x, int32_t y, int32_t flags
 
 static void TreatKeyInputMain(int32_t key)
 {
-
     static constexpr float kIncPosPerFrame = 0.8f;
     key &= 0xFF;
     switch (key) {

@@ -44,10 +44,11 @@ void ResetCameraPose()
 {
     camera_real.parameter.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
-        { 0.0f, 1.0f, 0.0f });   /* tvec */
+        { 0.0f, -1.0f, 0.0f }, true);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
+        
     camera_top.parameter.SetExtrinsic(
         { 90.0f, 0.0f, 0.0f },    /* rvec [deg] */
-        {  0.0f, 8.0f, 7.0f });   /* tvec */  /* tvec is in camera coordinate, so Z is height because pitch = 90 */
+        { 0.0f, -5.0f, 7.0f }, true);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
 }
 
 void ResetCamera(int32_t width, int32_t height)
@@ -122,33 +123,29 @@ static void loop_param()
         camera_top.parameter.UpdateNewCameraMatrix();
 
         cvui::text("Top Camera Parameter (Extrinsic)");
-        float temp_deg = Rad2Deg(camera_top.parameter.pitch());
-        MAKE_GUI_SETTING_FLOAT(temp_deg, "Pitch", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera_top.parameter.pitch() = Deg2Rad(temp_deg);
+        float pitch_deg = Rad2Deg(camera_top.parameter.pitch());
+        MAKE_GUI_SETTING_FLOAT(pitch_deg, "Pitch", 1.0f, "%.0Lf", -180.0f, 180.0f);
+        float yaw_deg = Rad2Deg(camera_top.parameter.yaw());
+        MAKE_GUI_SETTING_FLOAT(yaw_deg, "Yaw", 1.0f, "%.0Lf", -180.0f, 180.0f);
+        float roll_deg = Rad2Deg(camera_top.parameter.roll());
+        MAKE_GUI_SETTING_FLOAT(roll_deg, "Roll", 1.0f, "%.0Lf", -90.0f, 90.0f);
+        camera_top.parameter.SetCameraAngle(pitch_deg, yaw_deg, roll_deg);
 
-        temp_deg = Rad2Deg(camera_top.parameter.yaw());
-        MAKE_GUI_SETTING_FLOAT(temp_deg, "Yaw", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera_top.parameter.yaw() = Deg2Rad(temp_deg);
-
-        temp_deg = Rad2Deg(camera_top.parameter.roll());
-        MAKE_GUI_SETTING_FLOAT(temp_deg, "Roll", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera_top.parameter.roll() = Deg2Rad(temp_deg);
 
         cvui::text("Real Camera Parameter (Extrinsic)");
-        MAKE_GUI_SETTING_FLOAT(camera_real.parameter.y(), "Height", 1.0f, "%.0Lf", 0.0f, 5.0f);
+        float x = -camera_real.parameter.x();
+        float y = -camera_real.parameter.y();
+        float z = -camera_real.parameter.z();
+        MAKE_GUI_SETTING_FLOAT(y, "Height", 0.5f, "%.1Lf", 0.0f, -5.0f);
+        camera_real.parameter.SetCameraPos(x, y, z, false);
 
-        temp_deg = Rad2Deg(camera_real.parameter.pitch());
-        MAKE_GUI_SETTING_FLOAT(temp_deg, "Pitch", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera_real.parameter.pitch() = Deg2Rad(temp_deg);
-
-        temp_deg = Rad2Deg(camera_real.parameter.yaw());
-        MAKE_GUI_SETTING_FLOAT(temp_deg, "Yaw", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera_real.parameter.yaw() = Deg2Rad(temp_deg);
-
-        temp_deg = Rad2Deg(camera_real.parameter.roll());
-        MAKE_GUI_SETTING_FLOAT(temp_deg, "Roll", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera_real.parameter.roll() = Deg2Rad(temp_deg);
-
+        pitch_deg = Rad2Deg(camera_real.parameter.pitch());
+        MAKE_GUI_SETTING_FLOAT(pitch_deg, "Pitch", 1.0f, "%.0Lf", -180.0f, 180.0f);
+        yaw_deg = Rad2Deg(camera_real.parameter.yaw());
+        MAKE_GUI_SETTING_FLOAT(yaw_deg, "Yaw", 1.0f, "%.0Lf", -180.0f, 180.0f);
+        roll_deg = Rad2Deg(camera_real.parameter.roll());
+        MAKE_GUI_SETTING_FLOAT(roll_deg, "Roll", 1.0f, "%.0Lf", -90.0f, 90.0f);
+        camera_real.parameter.SetCameraAngle(pitch_deg, yaw_deg, roll_deg);
     }
     cvui::endColumn();
 
@@ -168,13 +165,12 @@ static void CallbackMouseMain(int32_t event, int32_t x, int32_t y, int32_t flags
         s_drag_previous_point.y = y;
     } else {
         if (s_drag_previous_point.x != kInvalidValue) {
-            camera_top.parameter.yaw() += kIncAnglePerPx * (x - s_drag_previous_point.x);
-            camera_top.parameter.pitch() -= kIncAnglePerPx * (y - s_drag_previous_point.y);
+            float delta_yaw = kIncAnglePerPx * (x - s_drag_previous_point.x);
+            float pitch_delta = -kIncAnglePerPx * (y - s_drag_previous_point.y);
+            camera_top.parameter.RotateCameraAngle(pitch_delta, delta_yaw, 0);
             s_drag_previous_point.x = x;
             s_drag_previous_point.y = y;
         }
-        camera_top.parameter.yaw() = (std::min)(Deg2Rad(90.0f), (std::max)(camera_top.parameter.yaw(), Deg2Rad(-90.0f)));
-        camera_top.parameter.pitch() = (std::min)(Deg2Rad(90.0f), (std::max)(camera_top.parameter.pitch(), Deg2Rad(-90.0f)));
     }
 }
 
@@ -185,46 +181,46 @@ static void TreatKeyInputMain(int32_t key)
     key &= 0xFF;
     switch (key) {
     case 'w':
-        camera_top.parameter.z() -= kIncPosPerFrame;
+        camera_top.parameter.MoveCameraPos(0, 0, kIncPosPerFrame, false);
         break;
     case 'W':
-        camera_top.parameter.z() -= kIncPosPerFrame * 3;
+        camera_top.parameter.MoveCameraPos(0, 0, kIncPosPerFrame, true);
         break;
     case 's':
-        camera_top.parameter.z() += kIncPosPerFrame;
+        camera_top.parameter.MoveCameraPos(0, 0, -kIncPosPerFrame, false);
         break;
     case 'S':
-        camera_top.parameter.z() += kIncPosPerFrame * 3;
+        camera_top.parameter.MoveCameraPos(0, 0, -kIncPosPerFrame, true);
         break;
     case 'a':
-        camera_top.parameter.x() += kIncPosPerFrame;
+        camera_top.parameter.MoveCameraPos(-kIncPosPerFrame, 0, 0, false);
         break;
     case 'A':
-        camera_top.parameter.x() += kIncPosPerFrame * 3;
+        camera_top.parameter.MoveCameraPos(-kIncPosPerFrame, 0, 0, true);
         break;
     case 'd':
-        camera_top.parameter.x() -= kIncPosPerFrame;
+        camera_top.parameter.MoveCameraPos(kIncPosPerFrame, 0, 0, false);
         break;
     case 'D':
-        camera_top.parameter.x() -= kIncPosPerFrame * 3;
+        camera_top.parameter.MoveCameraPos(kIncPosPerFrame, 0, 0, true);
         break;
     case 'z':
-        camera_top.parameter.y() += kIncPosPerFrame;
+        camera_top.parameter.MoveCameraPos(0, -kIncPosPerFrame, 0, false);
         break;
     case 'Z':
-        camera_top.parameter.y() += kIncPosPerFrame * 3;
+        camera_top.parameter.MoveCameraPos(0, -kIncPosPerFrame, 0, true);
         break;
     case 'x':
-        camera_top.parameter.y() -= kIncPosPerFrame;
+        camera_top.parameter.MoveCameraPos(0, kIncPosPerFrame, 0, false);
         break;
     case 'X':
-        camera_top.parameter.y() -= kIncPosPerFrame * 3;
+        camera_top.parameter.MoveCameraPos(0, kIncPosPerFrame, 0, true);
         break;
     case 'q':
-        camera_top.parameter.roll() += 0.1f;
+        camera_top.parameter.RotateCameraAngle(0, 0, 2.0f);
         break;
     case 'e':
-        camera_top.parameter.roll() -= 0.1f;
+        camera_top.parameter.RotateCameraAngle(0, 0, -2.0f);
         break;
     }
 }
