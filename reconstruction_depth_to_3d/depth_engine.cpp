@@ -88,13 +88,14 @@ bool DepthEngine::NormalizeMinMax(const cv::Mat& mat_depth, cv::Mat& mat_depth_n
 {
     /***
     * Normalize to uint8_t(0-255) (Far = 255, Neat = 0)
+    * Normalized Value  = 255 * (value - min) / (max - min)
     ***/
     mat_depth_normalized = cv::Mat(kModelInputHeight, kModelInputWidth, CV_8UC1);
     double depth_min, depth_max;
     cv::minMaxLoc(mat_depth, &depth_min, &depth_max);
     double range = depth_max - depth_min;
     if (range > 0) {
-        mat_depth.convertTo(mat_depth_normalized, CV_8UC1, 255. / range, (-255. * depth_min) / range);  /* value = 255 * (value - min) / (max - min) */
+        mat_depth.convertTo(mat_depth_normalized, CV_8UC1, 255. / range, (-255. * depth_min) / range);
         mat_depth_normalized = 255 - mat_depth_normalized;
         return true;
     } else {
