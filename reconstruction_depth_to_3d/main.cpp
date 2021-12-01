@@ -176,14 +176,6 @@ int main(int argc, char* argv[])
         cv::resize(image_depth, image_depth, image_input.size());
 
         /* Convert px,py,depth(Zc) -> Xc,Yc,Zc(in camera_2d_to_3d)(=Xw,Yw,Zw) */
-        static std::vector<cv::Point2f> image_point_in_original_image_list;
-        if (image_point_in_original_image_list.size() == 0) {   /* initialize only once */
-            for (int32_t y = 0; y < image_depth.rows; y += 1) {
-                for (int32_t x = 0; x < image_depth.cols; x += 1) {
-                    image_point_in_original_image_list.push_back(cv::Point2f(x, y));
-                }
-            }
-        }
         std::vector<float> depth_list;
         for (int32_t y = 0; y < image_depth.rows; y += 1) {
             for (int32_t x = 0; x < image_depth.cols; x += 1) {
@@ -192,17 +184,22 @@ int main(int argc, char* argv[])
             }
         }
         std::vector<cv::Point3f> object_point_list;
-        camera_2d_to_3d.ProjectImage2PosInCamera(image_point_in_original_image_list, depth_list, object_point_list);
+        camera_2d_to_3d.ProjectImage2PosInCamera(depth_list, object_point_list);
 
         /* Project 3D to 2D(new image) */
         std::vector<cv::Point2f> image_point_list;
         camera_3d_to_2d.ProjectWorld2Image(object_point_list, image_point_list);
 
         /* Draw the result */
-        cv::Mat mat_output = cv::Mat(kHeight, kWidth, CV_8UC3, cv::Scalar(0, 0, 0));
+        cv::Mat mat_output = cv::Mat(camera_3d_to_2d.parameter.height, camera_3d_to_2d.parameter.width, CV_8UC3, cv::Scalar(0, 0, 0));
+        cv::Mat mat_z_buffer = cv::Mat(mat_output.size(), CV_32FC1, 999999);
         for (int32_t i = 0; i < image_point_list.size(); i++) {
             if (CheckIfPointInArea(image_point_list[i], mat_output.size())) {
-                cv::circle(mat_output, image_point_list[i], 4, image_input.at<cv::Vec3b>(i), -1);
+                float& z_old = mat_z_buffer.at<float>(image_point_list[i]);
+                if (depth_list[i] < z_old) {  /* z_old is far */
+                    z_old = depth_list[i];
+                    cv::circle(mat_output, image_point_list[i], 4, image_input.at<cv::Vec3b>(i), -1);
+                }
             }
         }
 

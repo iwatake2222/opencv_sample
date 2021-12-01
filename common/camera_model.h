@@ -389,9 +389,21 @@ public:
         }
     }
 
-    void ProjectImage2PosInCamera(const std::vector<cv::Point2f>& image_point_list, const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
+    void ProjectImage2PosInCamera(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
     {
-        if (image_point_list.size() == 0) return;
+        if (z_list.size() != parameter.width * parameter.height) {
+            printf("[ProjectImage2PosInCamera] Invalid z_list size\n");
+            return;
+        }
+
+        /*** Generate the original image point mat ***/
+        /* todo: no need to generate every time */
+        std::vector<cv::Point2f> image_point_list;
+        for (int32_t y = 0; y < parameter.height; y += 1) {
+            for (int32_t x = 0; x < parameter.width; x += 1) {
+                image_point_list.push_back(cv::Point2f(float(x), float(y)));
+            }
+        }
 
         /*** Undistort image point ***/
         std::vector<cv::Point2f> image_point_undistort;

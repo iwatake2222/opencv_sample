@@ -34,7 +34,7 @@ private:
     static constexpr int32_t kModelInputWidth = 256;
     static constexpr int32_t kModelInputHeight = 256;
     const std::array<float, 3> kMeanList = { 0.485f, 0.456f, 0.406f };
-    const std::array<float, 3> kNormList = { 0.229, 0.224f, 0.225f };
+    const std::array<float, 3> kNormList = { 0.229f, 0.224f, 0.225f };
 
 public:
     DepthEngine() {}
