@@ -325,6 +325,30 @@ public:
 #endif
     }
 
+    void ProjectWorld2Camera(const std::vector<cv::Point3f>& object_point_in_world_list, std::vector<cv::Point3f>& object_point_in_camera_list)
+    {
+        cv::Mat K = parameter.K;
+        cv::Mat R = MakeRotateMat(Rad2Deg(parameter.pitch()), Rad2Deg(parameter.yaw()), Rad2Deg(parameter.roll()));
+        cv::Mat Rt = (cv::Mat_<float>(3, 4) <<
+            R.at<float>(0), R.at<float>(1), R.at<float>(2), parameter.x(),
+            R.at<float>(3), R.at<float>(4), R.at<float>(5), parameter.y(),
+            R.at<float>(6), R.at<float>(7), R.at<float>(8), parameter.z());
+
+        object_point_in_camera_list.resize(object_point_in_world_list.size());
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+        for (int32_t i = 0; i < object_point_in_world_list.size(); i++) {
+            const auto& object_point_in_world = object_point_in_world_list[i];
+            auto& object_point_in_camera = object_point_in_camera_list[i];
+            cv::Mat Mw = (cv::Mat_<float>(4, 1) << object_point_in_world.x, object_point_in_world.y, object_point_in_world.z, 1);
+            cv::Mat Mc = Rt * Mw;
+            object_point_in_camera.x = Mc.at<float>(0);
+            object_point_in_camera.y = Mc.at<float>(1);
+            object_point_in_camera.z = Mc.at<float>(2);
+        }
+     }
 
     void ProjectImage2GroundPlane(const std::vector<cv::Point2f>& image_point_list, std::vector<cv::Point3f>& object_point_list)
     {
