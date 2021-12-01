@@ -42,6 +42,8 @@ public:
     bool Initialize(const std::string& model_filename);
     bool Finalize();
     bool Process(const cv::Mat& image_input, cv::Mat& mat_depth);
+    bool NormalizeMinMax(const cv::Mat& mat_depth, cv::Mat& mat_depth_normalized);
+    bool NormalizeScaleShift(const cv::Mat& mat_depth, cv::Mat& mat_depth_normalized, float scale, float shift);
 
 private:
     void PreProcess(const cv::Mat& image_input, cv::Mat& blob_input);

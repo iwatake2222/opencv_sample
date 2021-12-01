@@ -83,7 +83,8 @@ static void CallbackMouseMain(int32_t event, int32_t x, int32_t y, int32_t flags
 
 static void TreatKeyInputMain(int32_t key)
 {
-    static constexpr float kIncPosPerFrame = 10.0f;
+    //static constexpr float kIncPosPerFrame = 10.0f;
+    static constexpr float kIncPosPerFrame = 0.001f;
     key &= 0xFF;
     switch (key) {
     case 'w':
@@ -168,21 +169,30 @@ int main(int argc, char* argv[])
     cv::Mat mat_depth;
     depth_engine.Process(image_input, mat_depth);
 
-    while(true) {
-        /* Draw depth */
-        cv::Mat image_depth;
-        //cv::applyColorMap(mat_depth, image_depth, cv::COLORMAP_JET);
-        image_depth = mat_depth;
-        cv::resize(image_depth, image_depth, image_input.size());
+    /* Draw depth */
+    cv::Mat mat_depth_normlized255;
+    depth_engine.NormalizeMinMax(mat_depth, mat_depth_normlized255);
+    cv::Mat image_depth;
+    cv::applyColorMap(mat_depth_normlized255, image_depth, cv::COLORMAP_JET);
+    cv::resize(image_depth, image_depth, image_input.size());
 
-        /* Convert px,py,depth(Zc) -> Xc,Yc,Zc(in camera_2d_to_3d)(=Xw,Yw,Zw) */
-        std::vector<float> depth_list;
-        for (int32_t y = 0; y < image_depth.rows; y += 1) {
-            for (int32_t x = 0; x < image_depth.cols; x += 1) {
-                float Z = image_depth.at<uint8_t>(cv::Point(x, y));
-                depth_list.push_back(Z);
-            }
+    /* Normalize depth for 3D reconstruction */
+    cv::Mat mat_depth_normlized;
+    //mat_depth_normlized255.convertTo(mat_depth_normlized, CV_32FC1);
+    depth_engine.NormalizeScaleShift(mat_depth, mat_depth_normlized, 1.0f, 0.0f);
+    cv::resize(mat_depth_normlized, mat_depth_normlized, image_input.size());
+
+    /* Generate depth list */
+    std::vector<float> depth_list;
+    for (int32_t y = 0; y < mat_depth_normlized.rows; y += 1) {
+        for (int32_t x = 0; x < mat_depth_normlized.cols; x += 1) {
+            float Z = mat_depth_normlized.at<float>(cv::Point(x, y));
+            depth_list.push_back(Z);
         }
+    }
+
+    while(true) {
+        /* Convert px,py,depth(Zc) -> Xc,Yc,Zc(in camera_2d_to_3d)(=Xw,Yw,Zw) */
         std::vector<cv::Point3f> object_point_list;
         camera_2d_to_3d.ProjectImage2PosInCamera(depth_list, object_point_list);
 
@@ -192,14 +202,9 @@ int main(int argc, char* argv[])
 
         /* Draw the result */
         cv::Mat mat_output = cv::Mat(camera_3d_to_2d.parameter.height, camera_3d_to_2d.parameter.width, CV_8UC3, cv::Scalar(0, 0, 0));
-        cv::Mat mat_z_buffer = cv::Mat(mat_output.size(), CV_32FC1, 999999);
         for (int32_t i = 0; i < image_point_list.size(); i++) {
             if (CheckIfPointInArea(image_point_list[i], mat_output.size())) {
-                float& z_old = mat_z_buffer.at<float>(image_point_list[i]);
-                if (depth_list[i] < z_old) {  /* z_old is far */
-                    z_old = depth_list[i];
-                    cv::circle(mat_output, image_point_list[i], 4, image_input.at<cv::Vec3b>(i), -1);
-                }
+                cv::circle(mat_output, image_point_list[i], 4, image_input.at<cv::Vec3b>(i), -1);
             }
         }
 

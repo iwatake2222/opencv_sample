@@ -76,17 +76,43 @@ bool DepthEngine::Process(const cv::Mat& image_input, cv::Mat& mat_depth)
     Inference(blob_input, { "797" }, output_mat_list);
 
     /* Post Process */
-    mat_depth = cv::Mat(kModelInputHeight, kModelInputWidth, CV_32FC1, output_mat_list[0].data);  /* value has no specific range */
-    double depth_min, depth_max;
-    cv::minMaxLoc(mat_depth, &depth_min, &depth_max);
-    mat_depth.convertTo(mat_depth, CV_8UC1, 255. / (depth_max - depth_min), (-255. * depth_min) / (depth_max - depth_min));
-    mat_depth = 255 - mat_depth;    /* Far = 255, Near = 0*/
-    //cv::Mat mat_depth;
-    //cv::applyColorMap(mat_out, mat_depth, cv::COLORMAP_JET);
+    /* Inverse relative depth (Far = small Value, Near = huge value) */
+    mat_depth = cv::Mat(kModelInputHeight, kModelInputWidth, CV_32FC1, output_mat_list[0].data);
+    mat_depth = mat_depth.clone();  /* I need to clone it because output_mat_list is destroyed */
 
     return true;
 }
 
+
+bool DepthEngine::NormalizeMinMax(const cv::Mat& mat_depth, cv::Mat& mat_depth_normalized)
+{
+    /***
+    * Normalize to uint8_t(0-255) (Far = 255, Neat = 0)
+    ***/
+    mat_depth_normalized = cv::Mat(kModelInputHeight, kModelInputWidth, CV_8UC1);
+    double depth_min, depth_max;
+    cv::minMaxLoc(mat_depth, &depth_min, &depth_max);
+    double range = depth_max - depth_min;
+    if (range > 0) {
+        mat_depth.convertTo(mat_depth_normalized, CV_8UC1, 255. / range, (-255. * depth_min) / range);  /* value = 255 * (value - min) / (max - min) */
+        mat_depth_normalized = 255 - mat_depth_normalized;
+        return true;
+    } else {
+        return false;
+    }
+}
+
+bool DepthEngine::NormalizeScaleShift(const cv::Mat& mat_depth, cv::Mat& mat_depth_normalized, float scale, float shift)
+{
+    /***
+    * Normalize to float (Far = huge value, Near = small value)
+    * 1 / Normalized Value = Estimated Depth(inverse relative depth) * scale + shift
+    ***/
+    mat_depth_normalized = cv::Mat(kModelInputHeight, kModelInputWidth, CV_32FC1);
+    mat_depth.convertTo(mat_depth_normalized, CV_32FC1, scale, shift);
+    mat_depth_normalized = 1.0 / mat_depth_normalized;
+    return true;
+}
 
 void DepthEngine::PreProcess(const cv::Mat& image_input, cv::Mat& blob_input)
 {
