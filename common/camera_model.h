@@ -50,7 +50,7 @@ class CameraModel {
     *     Mc: カメラ座標上での対象物体の座標 (Xc, Yc, Zc)
     *         = [R t] * [Mw, 1]
     * 
-    * 理由: Mc = R(Mw - T) = Mw - RT = Mw + t   (t = -RT)
+    * 理由: Mc = R(Mw - T) = RMw - RT = RMw + t   (t = -RT)
     * 
     * 注意1: tはカメラ座標上でのベクトルである。そのため、Rを変更した場合はtを再計算する必要がある
     * 

@@ -202,7 +202,7 @@ int main(int argc, char* argv[])
         cv::Mat mat_output = cv::Mat(kHeight, kWidth, CV_8UC3, cv::Scalar(0, 0, 0));
         for (int32_t i = 0; i < image_point_list.size(); i++) {
             if (CheckIfPointInArea(image_point_list[i], mat_output.size())) {
-                cv::circle(mat_output, image_point_list[i], 2, image_input.at<cv::Vec3b>(i), -1);
+                cv::circle(mat_output, image_point_list[i], 4, image_input.at<cv::Vec3b>(i), -1);
             }
         }
 
