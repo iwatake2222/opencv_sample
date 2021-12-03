@@ -35,7 +35,7 @@ https://github.com/iwatake2222/opencv_sample/tree/master/01_article/00_camera_mo
 ```cmake:CMakeLists.txt
 cmake_minimum_required(VERSION 3.0)
 
-project(pj_cv_camera_model)
+project(main)
 
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_CXX_STANDARD 14)
@@ -44,7 +44,7 @@ find_package(OpenCV REQUIRED)
 include_directories(${OpenCV_INCLUDE_DIRS})
 link_libraries(${OpenCV_LIBS})
 
-add_executable(pj_cv_camera_model main.cpp camera_model.h)
+add_executable(main main.cpp camera_model.h)
 ```
 
 
