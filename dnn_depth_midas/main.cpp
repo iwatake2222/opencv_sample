@@ -26,11 +26,14 @@ limitations under the License.
 
 #include <opencv2/opencv.hpp>
 
+#define CVUI_IMPLEMENTATION
+#include "cvui.h"
+
 #include "common_helper_cv.h"
 #include "depth_engine.h"
 
 /*** Macro ***/
-static constexpr char kInputImageFilename[] = RESOURCE_DIR"/room_00.jpg";
+static constexpr char kInputImageFilename[] = RESOURCE_DIR"/parrot.jpg";
 
 
 /*** Global variable ***/
@@ -39,6 +42,8 @@ static constexpr char kInputImageFilename[] = RESOURCE_DIR"/room_00.jpg";
 /*** Function ***/
 int main(int argc, char *argv[])
 {
+    cvui::init("Output");   // use cvui for track bar
+
     /* Initialize Model */
     DepthEngine depth_engine;
     depth_engine.Initialize("");
@@ -49,10 +54,9 @@ int main(int argc, char *argv[])
     if (!CommonHelper::FindSourceImage(input_name, cap)) {
         return -1;
     }
-
+    
     /* Process for each frame */
-    int32_t frame_cnt = 0;
-    for (frame_cnt = 0; cap.isOpened() || frame_cnt < 1; frame_cnt++) {
+    for (int32_t frame_cnt = 0; ; frame_cnt++) {
         /* Read image */
         cv::Mat image_input;
         if (cap.isOpened()) {
@@ -62,20 +66,37 @@ int main(int argc, char *argv[])
         }
         if (image_input.empty()) break;
 
-        /* Detect face */
+        int32_t input_height = (std::min)(400, image_input.cols);
+        cv::resize(image_input, image_input, cv::Size((input_height * image_input.cols) / image_input.rows, input_height));
+
+        /* Estimate depth */
         cv::Mat mat_depth;
         depth_engine.Process(image_input, mat_depth);
 
-        /* Draw Result */
+        /* Draw Depth */
+        cv::Mat mat_depth_normlized255;
+        depth_engine.NormalizeMinMax(mat_depth, mat_depth_normlized255);
+        cv::resize(mat_depth_normlized255, mat_depth_normlized255, image_input.size());
         cv::Mat image_depth;
-        //cv::applyColorMap(mat_depth, image_depth, cv::COLORMAP_JET);
-        image_depth = mat_depth;
-        cv::resize(image_depth, image_depth, image_input.size());
+        cv::applyColorMap(mat_depth_normlized255, image_depth, cv::COLORMAP_JET);
+        
+        
+        /* Draw Image (only near object) */
+        cv::Mat image_output = cv::Mat(image_input.size(), CV_8UC3, cv::Scalar(0, 0, 0));
+        static int32_t depth_threshold = 255;
+        for (int32_t i = 0; i < image_output.total(); i++) {
+            if (mat_depth_normlized255.at<uint8_t>(i) <= depth_threshold) {
+                image_output.at<cv::Vec3b>(i) = image_input.at<cv::Vec3b>(i);
+            }
+        }
+        cvui::trackbar<int32_t>(image_output, 10, 10, 200, &depth_threshold, 0, 255);
 
         cv::imshow("Input", image_input);
         cv::imshow("Depth", image_depth);
+        cv::imshow("Output", image_output);
+        
         int32_t key = cv::waitKey(1);
-        if (key == 'q') break;
+        if (key == 27) break;   /* ESC to quit */
     }
 
     depth_engine.Finalize();

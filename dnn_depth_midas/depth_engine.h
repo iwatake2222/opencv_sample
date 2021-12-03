@@ -34,7 +34,7 @@ private:
     static constexpr int32_t kModelInputWidth = 256;
     static constexpr int32_t kModelInputHeight = 256;
     const std::array<float, 3> kMeanList = { 0.485f, 0.456f, 0.406f };
-    const std::array<float, 3> kNormList = { 0.229, 0.224f, 0.225f };
+    const std::array<float, 3> kNormList = { 0.229f, 0.224f, 0.225f };
 
 public:
     DepthEngine() {}
@@ -42,6 +42,8 @@ public:
     bool Initialize(const std::string& model_filename);
     bool Finalize();
     bool Process(const cv::Mat& image_input, cv::Mat& mat_depth);
+    bool NormalizeMinMax(const cv::Mat& mat_depth, cv::Mat& mat_depth_normalized);
+    bool NormalizeScaleShift(const cv::Mat& mat_depth, cv::Mat& mat_depth_normalized, float scale, float shift);
 
 private:
     void PreProcess(const cv::Mat& image_input, cv::Mat& blob_input);
