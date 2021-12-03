@@ -119,7 +119,7 @@ void DepthEngine::PreProcess(const cv::Mat& image_input, cv::Mat& blob_input)
 {
     cv::Mat image_normalize;
     cv::resize(image_input, image_normalize, cv::Size(kModelInputWidth, kModelInputHeight));
-    
+    cv::cvtColor(image_normalize, image_normalize, cv::COLOR_BGR2RGB);
     image_normalize.convertTo(image_normalize, CV_32FC3);
     cv::subtract(image_normalize, cv::Scalar(cv::Vec<float, 3>(kMeanList[0], kMeanList[1], kMeanList[2])), image_normalize);
     cv::multiply(image_normalize, cv::Scalar(cv::Vec<float, 3>(kNormList[0], kNormList[1], kNormList[2])), image_normalize);

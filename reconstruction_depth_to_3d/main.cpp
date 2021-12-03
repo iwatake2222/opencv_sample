@@ -32,10 +32,11 @@ limitations under the License.
 #include "camera_model.h"
 
 /*** Macro ***/
-static constexpr char kInputImageFilename[] = RESOURCE_DIR"/room_00.jpg";
-static constexpr int32_t kWidth = 640;
-static constexpr int32_t kHeight = 480;
-static constexpr float   kFovDeg = 60.0f;
+static constexpr char kInputImageFilename[] = RESOURCE_DIR"/room_02.jpg";
+static constexpr float   kCamera2d3dFovDeg = 120.0f;
+static constexpr int32_t kCamera3d2dWidth = 1280;
+static constexpr int32_t kCamera3d2dHeight = 720;
+static constexpr float   kCamera3d2dFovDeg = 100.0f;
 #define NORMALIZE_BY_255
 
 /*** Global variable ***/
@@ -45,14 +46,14 @@ static CameraModel camera_3d_to_2d;
 /*** Function ***/
 void initialize_camera(int32_t width, int32_t height)
 {
-    camera_2d_to_3d.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kFovDeg));
+    camera_2d_to_3d.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kCamera2d3dFovDeg));
     camera_2d_to_3d.parameter.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
     camera_2d_to_3d.parameter.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
         { 0.0f, 0.0f, 0.0f }, true);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
                                        /* tvec must be zero, so that calculated Mc(Location in camera cooridinate) becomes the same as Mw(location in world coordinate), and can be used to convert from 3D to 2D later */
 
-    camera_3d_to_2d.parameter.SetIntrinsic(kWidth, kHeight, CameraModel::FocalLength(kWidth, kFovDeg));
+    camera_3d_to_2d.parameter.SetIntrinsic(kCamera3d2dWidth, kCamera3d2dHeight, CameraModel::FocalLength(kCamera3d2dWidth, kCamera3d2dFovDeg));
     camera_3d_to_2d.parameter.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
     camera_3d_to_2d.parameter.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
@@ -216,13 +217,13 @@ int main(int argc, char* argv[])
         std::iota(indices_depth.begin(), indices_depth.end(), 0);
         std::sort(indices_depth.begin(), indices_depth.end(), [&object_point_in_camera_list](int32_t i1, int32_t i2) {
             return object_point_in_camera_list[i1].z > object_point_in_camera_list[i2].z;
-            });
+        });
 
         /* Draw the result */
         cv::Mat mat_output = cv::Mat(camera_3d_to_2d.parameter.height, camera_3d_to_2d.parameter.width, CV_8UC3, cv::Scalar(0, 0, 0));
         for (int32_t i : indices_depth) {
             if (CheckIfPointInArea(image_point_list[i], mat_output.size())) {
-                cv::circle(mat_output, image_point_list[i], 2, image_input.at<cv::Vec3b>(i), -1);
+                cv::circle(mat_output, image_point_list[i], 4, image_input.at<cv::Vec3b>(i), -1);
             }
         }
 
