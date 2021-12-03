@@ -57,7 +57,7 @@ class CameraModel {
     ***/
 
 
-public:
+private:
     /* Intrinsic parameters */
     /* float, 3 x 3 */
     cv::Mat K;
@@ -72,9 +72,9 @@ public:
     /* float, 3 x 1, (X, Y, Z): horizontal, vertical, depth (Camera location: Ow - Oc in camera coordinate) */
     cv::Mat tvec;
 
-
-    /* Default Parameters */
+public:
     CameraModel() {
+        /* Default Parameters */
         SetIntrinsic(1280, 720, 500.0f);
         SetExtrinsic({ 0, 0, 0 }, { 0, 0, 0 });
     }
