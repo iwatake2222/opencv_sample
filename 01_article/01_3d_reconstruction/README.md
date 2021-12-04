@@ -75,9 +75,9 @@ add_definitions(-DRESOURCE_DIR="${CMAKE_BINARY_DIR}/resource/")
 - そのため、ここでは奥行をディープラーニングモデルによって取得します。depth map、つまりZcを得ることができます
 - Zcが分かれば、カメラ座標系での座標(Xc, Yc, Zc)は下記の通り簡単に計算可能です
     - $ u : fy = Yc : Zc $
-    - ⇒ $ Yc = u * Zc / fy [px] = (y - cy) * Zc / fy [px] $
+    - ⇒ $ Yc = u \times Zc / fy  \text{  [px]}  = (y - cy) \times Zc / fy \text{  [px]} $
 - Xcについても同様に以下のように計算できます
-    - $ Xc = v * Zc / fx [px] = (x - cx) * Zc / fx [px] $
+    - $ Xc = v \times Zc / fx  \text{  [px]}  = (x - cx) \times Zc / fx \text{  [px]} $
 
 ![image](image/conv_2d_3d_00.png)
 
@@ -105,7 +105,8 @@ add_definitions(-DRESOURCE_DIR="${CMAKE_BINARY_DIR}/resource/")
 
 # Depth推定について
 - ということで、奥行きZcさえ分かれば、割と簡単に3次元再構築はできてしまいます
-- depth推定が鍵となりますが、それについてはここでは細かく触れませんが、ざっと説明だけします
+- Zcを取得する方法は色々あります。LiDAR、ステレオカメラ、ディープラーニングによる単眼深度推定、など
+- 今回は、ディープラーニングモデルを使います。が、それ自体についてはここでは細かく触れません。ざっと説明だけします
 
 ## 使用するモデル
 - MiDaS v2.1 small
@@ -120,7 +121,7 @@ add_definitions(-DRESOURCE_DIR="${CMAKE_BINARY_DIR}/resource/")
         - 遠い = 大きい値、とすると空を撮影した場合などに無限値になってしまうので、逆にしたほうが都合がよい
         - 絶対値を取ることはできないのでrelative。だけど、正解(絶対値)とは線形の相関関係になる
 
-## 出力値の扱い方
+## 出力値の正規化
 - MiDaSの出力値は、Inverse relative depthとなり、そのままでは使いづらいため、以下のように正規化します
     - 0-255で正規化: $ 255 - 255 \times (value - min) / (max - min) $
     - scale_shift正規化: $ 1 / (value \times scale + shift) $
@@ -190,10 +191,10 @@ class CameraModel {
 - 2つのカメラを用意しています
     - `InitializeCamera` 関数でパラメータを設定しています
     - `camera_2d_to_3d` : 入力となる静止画像を撮影したカメラです。このカメラの位置をワールド座標原点とします。3D再構築に使います
-    - `camera_3d_to_2d` : 再構築した3Dの点を表示するために使います。キーボード、マウスでカメラ位置を自由に変えます
+    - `camera_3d_to_2d` : 再構築した3Dの点を表示するために使います。今カメラの位置は、キーボード、マウスで自由に変えることができます
 - `main` 関数の先頭
     - まずは静止画像を読み込み、処理しやすいサイズにリサイズします。そして、入力サイズに合わせてカメラパラメータの設定をしています
-    - そのあと、depth mapを生成しています。正規化した結果は`depth_list` に格納されます
+    - そのあと、depth mapを推定しています。正規化した結果は`depth_list` に格納されます
     - そして、先ほど作成した `ProjectImage2Camera` 関数を呼び、入力静止画像の各点(2D)を3D空間の点(Xw, Yw, Zw)に変換し、`object_point_list` として格納しておきます
 - `main` 関数のwhileループ内
     - 結果表示用の`camera_3d_to_2d` を用いて、3Dの点を2D上に投影します
@@ -201,7 +202,7 @@ class CameraModel {
         - 2つの異なる3D点が、2D画像上で同じ位置に投影される可能性があります。そのとき、描画する順番によってはカメラより奥にある点が、手前にある点を上書きしてしまうことがあります
         - 回避するために、描画時にその点のZcをチェックして、既に描画済みのZcよりも奥だったら描画しない、とする方法があります。Zバッファ法 (Depth Buffer法)
         - ここでは、一度全部の点のZcを計算し、Zcの小さい順に描画をすることで、この問題を回避しています。`indices_depth` に奥にある方から順に(Zcの大きい順に)、インデックス番号が格納されます
-- `camera_3d_to_2d` カメラの外部パラメータをマウス、キーボード操作によって変えることで、自由に動くことができます。実装の中身は前回と同様であるため、下記には省略しています
+- `camera_3d_to_2d` カメラの外部パラメータをマウス、キーボード操作によって変えることで、自由に動くことができます。実装の中身は前回と同様であるため、下記では省略しています
 
 ```cpp:main.cpp
 /*** Macro ***/
@@ -290,7 +291,7 @@ int main(int argc, char* argv[])
         std::iota(indices_depth.begin(), indices_depth.end(), 0);
         std::sort(indices_depth.begin(), indices_depth.end(), [&object_point_in_camera_list](int32_t i1, int32_t i2) {
             return object_point_in_camera_list[i1].z > object_point_in_camera_list[i2].z;
-            });
+        });
 
         /* Draw the result */
         cv::Mat mat_output = cv::Mat(camera_3d_to_2d.height, camera_3d_to_2d.width, CV_8UC3, cv::Scalar(0, 0, 0));
