@@ -123,27 +123,27 @@ static void loop_param()
         camera_top.parameter.UpdateNewCameraMatrix();
 
         cvui::text("Top Camera Parameter (Extrinsic)");
-        float pitch_deg = Rad2Deg(camera_top.parameter.pitch());
+        float pitch_deg = Rad2Deg(camera_top.parameter.rx());
         MAKE_GUI_SETTING_FLOAT(pitch_deg, "Pitch", 1.0f, "%.0Lf", -180.0f, 180.0f);
-        float yaw_deg = Rad2Deg(camera_top.parameter.yaw());
+        float yaw_deg = Rad2Deg(camera_top.parameter.ry());
         MAKE_GUI_SETTING_FLOAT(yaw_deg, "Yaw", 1.0f, "%.0Lf", -180.0f, 180.0f);
-        float roll_deg = Rad2Deg(camera_top.parameter.roll());
+        float roll_deg = Rad2Deg(camera_top.parameter.rz());
         MAKE_GUI_SETTING_FLOAT(roll_deg, "Roll", 1.0f, "%.0Lf", -90.0f, 90.0f);
         camera_top.parameter.SetCameraAngle(pitch_deg, yaw_deg, roll_deg);
 
 
         cvui::text("Real Camera Parameter (Extrinsic)");
-        float x = -camera_real.parameter.x();
-        float y = -camera_real.parameter.y();
-        float z = -camera_real.parameter.z();
+        float x = -camera_real.parameter.tx();
+        float y = -camera_real.parameter.ty();
+        float z = -camera_real.parameter.tz();
         MAKE_GUI_SETTING_FLOAT(y, "Height", 0.5f, "%.1Lf", 0.0f, -5.0f);
         camera_real.parameter.SetCameraPos(x, y, z, false);
 
-        pitch_deg = Rad2Deg(camera_real.parameter.pitch());
+        pitch_deg = Rad2Deg(camera_real.parameter.rx());
         MAKE_GUI_SETTING_FLOAT(pitch_deg, "Pitch", 1.0f, "%.0Lf", -180.0f, 180.0f);
-        yaw_deg = Rad2Deg(camera_real.parameter.yaw());
+        yaw_deg = Rad2Deg(camera_real.parameter.ry());
         MAKE_GUI_SETTING_FLOAT(yaw_deg, "Yaw", 1.0f, "%.0Lf", -180.0f, 180.0f);
-        roll_deg = Rad2Deg(camera_real.parameter.roll());
+        roll_deg = Rad2Deg(camera_real.parameter.rz());
         MAKE_GUI_SETTING_FLOAT(roll_deg, "Roll", 1.0f, "%.0Lf", -90.0f, 90.0f);
         camera_real.parameter.SetCameraAngle(pitch_deg, yaw_deg, roll_deg);
     }

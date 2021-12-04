@@ -68,8 +68,8 @@ int main(int argc, char* argv[])
             for (int32_t x = 0; x < image.cols - 1; x++) {
                 int32_t x0 = x + 0;
                 int32_t x1 = x + 1;
-                int32_t y0 = a * x0 + b;
-                int32_t y1 = a * x1 + b;
+                int32_t y0 = static_cast<int32_t>(a * x0 + b);
+                int32_t y1 = static_cast<int32_t>(a * x1 + b);
                 cv::line(image, cv::Point(x0, y0), cv::Point(x1, y1), cv::Scalar(255, 0, 0));
             }
         }
@@ -78,8 +78,8 @@ int main(int argc, char* argv[])
             for (int32_t x = 0; x < image.cols - 1; x++) {
                 int32_t x0 = x + 0;
                 int32_t x1 = x + 1;
-                int32_t y0 = a * x0 * x0 + b * x0 + c;
-                int32_t y1 = a * x1 * x1 + b * x1 + c;
+                int32_t y0 = static_cast<int32_t>(a * x0 * x0 + b * x0 + c);
+                int32_t y1 = static_cast<int32_t>(a * x1 * x1 + b * x1 + c);
                 cv::line(image, cv::Point(x0, y0), cv::Point(x1, y1), cv::Scalar(0, 255, 0));
             }
         }

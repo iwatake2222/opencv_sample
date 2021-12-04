@@ -70,10 +70,11 @@ static void loop_main(const cv::Mat& image_org)
     object_point_list.push_back(cv::Point3f(-1 * aspect, 1, 0));
 
     /* Rotate object */
-    static float x_deg, y_deg;
-    CameraModel::RotateObject(x_deg, y_deg, 0, object_point_list);
-    x_deg += 4.9f;  /* don't use a good cut-off number to avoid gimbal lock */
-    y_deg += 5.1f;
+    static float x_deg, y_deg, r_deg;
+    CameraModel::RotateObject(x_deg, y_deg, r_deg, object_point_list);
+    x_deg += 1.1f;  /* don't use a good cut-off number to avoid gimbal lock */
+    y_deg += 1.2f;
+    r_deg += 1.3f;
 
     /* Convert to image points (2D) */
     std::vector<cv::Point2f> image_point_list;
@@ -129,17 +130,17 @@ static void loop_param()
         camera.parameter.UpdateNewCameraMatrix();
 
         cvui::text("Camera Parameter (Extrinsic)");
-        float pitch_deg = Rad2Deg(camera.parameter.pitch());
+        float pitch_deg = Rad2Deg(camera.parameter.rx());
         MAKE_GUI_SETTING_FLOAT(pitch_deg, "Pitch", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        float yaw_deg = Rad2Deg(camera.parameter.yaw());
+        float yaw_deg = Rad2Deg(camera.parameter.ry());
         MAKE_GUI_SETTING_FLOAT(yaw_deg, "Yaw", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        float roll_deg = Rad2Deg(camera.parameter.roll());
+        float roll_deg = Rad2Deg(camera.parameter.rz());
         MAKE_GUI_SETTING_FLOAT(roll_deg, "Roll", 1.0f, "%.0Lf", -90.0f, 90.0f);
         camera.parameter.SetCameraAngle(pitch_deg, yaw_deg, roll_deg);
 
-        float x = -camera.parameter.x();
-        float y = -camera.parameter.y();
-        float z = -camera.parameter.z();
+        float x = -camera.parameter.tx();
+        float y = -camera.parameter.ty();
+        float z = -camera.parameter.tz();
         MAKE_GUI_SETTING_FLOAT(x, "X", 1.0f, "%.0Lf", -20.0f, 20.0f);
         MAKE_GUI_SETTING_FLOAT(y, "Y", 1.0f, "%.0Lf", -20.0f, 20.0f);
         MAKE_GUI_SETTING_FLOAT(z, "Z", 1.0f, "%.0Lf", -20.0f, 20.0f);

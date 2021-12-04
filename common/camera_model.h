@@ -39,14 +39,14 @@ static inline float Rad2Deg(float rad) { return static_cast<float>(rad * 180.0 /
 
 class CameraModel {
     /***
-    * s[u, v, 1] = K * [R t] * [Mw, 1]
+    * s[x, y, 1] = K * [R t] * [Mw, 1]
     *     K: カメラの内部パラメータ
     *     [R t]: カメラの外部パラメータ
     *     R: ワールド座標上でのカメラの回転行列 (カメラの姿勢)
     *     t: カメラ座標上での、カメラ位置(Oc)からワールド座標原点(Ow)へのベクトル= Ow - Oc
     *         = -RT (T = ワールド座標上でのOwからOcへのベクトル)
     *     Mw: ワールド座標上での対象物体の座標 (Xw, Yw, Zw)
-    * s[u, v, 1] = K * Mc
+    * s[x, y, 1] = K * Mc
     *     Mc: カメラ座標上での対象物体の座標 (Xc, Yc, Zc)
     *         = [R t] * [Mw, 1]
     * 
@@ -61,21 +61,21 @@ class CameraModel {
 public:
     class Parameter {
     public:
-        float& pitch() { return rvec.at<float>(0); }
-        float& yaw() { return rvec.at<float>(1); }
-        float& roll() { return rvec.at<float>(2); }
-        float& x() { return tvec.at<float>(0); }
-        float& y() { return tvec.at<float>(1); }
-        float& z() { return tvec.at<float>(2); }
+        float& rx() { return rvec.at<float>(0); }   /* pitch */
+        float& ry() { return rvec.at<float>(1); }   /* yaw */
+        float& rz() { return rvec.at<float>(2); }   /* roll */
+        float& tx() { return tvec.at<float>(0); }
+        float& ty() { return tvec.at<float>(1); }
+        float& tz() { return tvec.at<float>(2); }
         float& fx() { return K.at<float>(0); }
         float& cx() { return K.at<float>(2); }
         float& fy() { return K.at<float>(4); }
         float& cy() { return K.at<float>(5); }
 
-        /* float, 3 x 1, pitch,  yaw, roll [rad] */
+        /* float, 3 x 1, pitch(rx),  yaw(ry), roll(rz) [rad] */
         cv::Mat rvec;
 
-        /* float, 3 x 1, (X, Y, Z): horizontal, vertical, depth (Camera location: Ow - Oc in camera coordinate) */
+        /* float, 3 x 1, (tx, ty, tz): horizontal, vertical, depth (Camera location: Ow - Oc in camera coordinate) */
         cv::Mat tvec;
 
         /* float, 3 x 3 */
@@ -118,17 +118,17 @@ public:
             }
         }
 
-        /* 
-        is_t_on_world == true: tvec = T (Oc - Ow in world coordinate)
-        is_t_on_world == false: tvec = tvec (Ow - Oc in camera coordinate) 
-        */
         void SetExtrinsic(const std::array<float, 3>& r_deg, const std::array<float, 3>& t, bool is_t_on_world = true)
         {
             rvec = (cv::Mat_<float>(3, 1) << Deg2Rad(r_deg[0]), Deg2Rad(r_deg[1]), Deg2Rad(r_deg[2]));
             tvec = (cv::Mat_<float>(3, 1) << t[0], t[1], t[2]);
 
+            /*
+              is_t_on_world == true: tvec = T (Oc - Ow in world coordinate)
+              is_t_on_world == false: tvec = tvec (Ow - Oc in camera coordinate)
+            */
             if (is_t_on_world) {
-                auto R = MakeRotateMat(r_deg[0], r_deg[1], r_deg[2]);
+                cv::Mat R = MakeRotationMat(Rad2Deg(rx()), Rad2Deg(ry()), Rad2Deg(rz()));
                 tvec = -R * tvec;   /* t = -RT */
             }
         }
@@ -139,12 +139,11 @@ public:
             t = { tvec.at<float>(0), tvec.at<float>(1), tvec.at<float>(2) };
         }
 
-        void SetCameraPos(float x, float y, float z, bool is_on_world = true)    /* Oc - Ow */
+        void SetCameraPos(float tx, float ty, float tz, bool is_on_world = true)    /* Oc - Ow */
         {
-            tvec = (cv::Mat_<float>(3, 1) << x, y, z);
+            tvec = (cv::Mat_<float>(3, 1) << tx, ty, tz);
             if (is_on_world) {
-                cv::Mat R;
-                cv::Rodrigues(rvec, R);
+                cv::Mat R = MakeRotationMat(Rad2Deg(rx()), Rad2Deg(ry()), Rad2Deg(rz()));
                 tvec = -R * tvec;   /* t = -RT */
             } else {
                 /* Oc - Ow -> Ow - Oc */
@@ -152,12 +151,11 @@ public:
             }
         }
 
-        void MoveCameraPos(float dx, float dy, float dz, bool is_on_world = true)    /* Oc - Ow */
+        void MoveCameraPos(float dtx, float dty, float dtz, bool is_on_world = true)    /* Oc - Ow */
         {
-            cv::Mat tvec_delta = (cv::Mat_<float>(3, 1) << dx, dy, dz);
+            cv::Mat tvec_delta = (cv::Mat_<float>(3, 1) << dtx, dty, dtz);
             if (is_on_world) {
-                cv::Mat R;
-                cv::Rodrigues(rvec, R);
+                cv::Mat R = MakeRotationMat(Rad2Deg(rx()), Rad2Deg(ry()), Rad2Deg(rz()));
                 tvec_delta = -R * tvec_delta;
             } else {
                 /* Oc - Ow -> Ow - Oc */
@@ -169,27 +167,22 @@ public:
         void SetCameraAngle(float pitch_deg, float yaw_deg, float roll_deg)
         {
             /* t vec is vector in camera coordinate, so need to re-calculate it when rvec is updated */
-            cv::Mat R_old;
-            cv::Rodrigues(rvec, R_old);
+            cv::Mat R_old = MakeRotationMat(Rad2Deg(rx()), Rad2Deg(ry()), Rad2Deg(rz()));
             cv::Mat T = -R_old.inv() * tvec;      /* T is tvec in world coordinate.  t = -RT */
             rvec = (cv::Mat_<float>(3, 1) << Deg2Rad(pitch_deg), Deg2Rad(yaw_deg), Deg2Rad(roll_deg));
-            cv::Mat R_new;
-            cv::Rodrigues(rvec, R_new);
+            cv::Mat R_new = MakeRotationMat(Rad2Deg(rx()), Rad2Deg(ry()), Rad2Deg(rz()));
             tvec = -R_new * T;   /* t = -RT */
         }
 
         void RotateCameraAngle(float dpitch_deg, float dyaw_deg, float droll_deg)
         {
             /* t vec is vector in camera coordinate, so need to re-calculate it when rvec is updated */
-            cv::Mat R_old;
-            cv::Rodrigues(rvec, R_old);
+            cv::Mat R_old = MakeRotationMat(Rad2Deg(rx()), Rad2Deg(ry()), Rad2Deg(rz()));
             cv::Mat T = -R_old.inv() * tvec;      /* T is tvec in world coordinate.  t = -RT */
-            cv::Mat rvec_delta = (cv::Mat_<float>(3, 1) << Deg2Rad(dpitch_deg), Deg2Rad(dyaw_deg), Deg2Rad(droll_deg));
-            cv::Mat R_delta;
-            cv::Rodrigues(rvec_delta, R_delta);
+            cv::Mat R_delta = MakeRotationMat(dpitch_deg, dyaw_deg, droll_deg);
             cv::Mat R_new = R_delta * R_old;
             tvec = -R_new * T;   /* t = -RT */
-            cv::Rodrigues(R_new, rvec);
+            cv::Rodrigues(R_new, rvec); /* Rotation matrix -> rvec */
         }
     };
 
@@ -202,7 +195,7 @@ public:
     }
 
     template <typename T = float>
-    static cv::Mat MakeRotateMat(T x_deg, T y_deg, T z_deg)
+    static cv::Mat MakeRotationMat(T x_deg, T y_deg, T z_deg)
     {
         T x_rad = Deg2Rad(x_deg);
         T y_rad = Deg2Rad(y_deg);
@@ -227,16 +220,16 @@ public:
         cv::Mat R = R_z * R_x * R_y;
 #else
         /* Rodrigues */
-        cv::Mat r = (cv::Mat_<T>(3, 1) << x_rad, y_rad, z_rad);
+        cv::Mat rvec = (cv::Mat_<T>(3, 1) << x_rad, y_rad, z_rad);
         cv::Mat R;
-        cv::Rodrigues(r, R);
+        cv::Rodrigues(rvec, R);
 #endif
         return R;
     }
 
     static void RotateObject(float x_deg, float y_deg, float z_deg, std::vector<cv::Point3f>& object_point_list)
     {
-        cv::Mat R = MakeRotateMat(x_deg, y_deg, z_deg);
+        cv::Mat R = MakeRotationMat(x_deg, y_deg, z_deg);
         for (auto& object_point : object_point_list) {
             cv::Mat p = (cv::Mat_<float>(3, 1) << object_point.x, object_point.y, object_point.z);
             p = R * p;
@@ -269,13 +262,13 @@ public:
         /* the followings get exactly the same result */
 #if 1
         /*** Projection ***/
-        /* s[u, v, 1] = K * [R t] * [M, 1] = K * M_from_cam */
+        /* s[x, y, 1] = K * [R t] * [M, 1] = K * M_from_cam */
         cv::Mat K = parameter.K;
-        cv::Mat R = MakeRotateMat(Rad2Deg(parameter.pitch()), Rad2Deg(parameter.yaw()), Rad2Deg(parameter.roll()));
+        cv::Mat R = MakeRotationMat(Rad2Deg(parameter.rx()), Rad2Deg(parameter.ry()), Rad2Deg(parameter.rz()));
         cv::Mat Rt = (cv::Mat_<float>(3, 4) <<
-            R.at<float>(0), R.at<float>(1), R.at<float>(2), parameter.x(),
-            R.at<float>(3), R.at<float>(4), R.at<float>(5), parameter.y(),
-            R.at<float>(6), R.at<float>(7), R.at<float>(8), parameter.z());
+            R.at<float>(0), R.at<float>(1), R.at<float>(2), parameter.tx(),
+            R.at<float>(3), R.at<float>(4), R.at<float>(5), parameter.ty(),
+            R.at<float>(6), R.at<float>(7), R.at<float>(8), parameter.tz());
 
         image_point_list.resize(object_point_list.size());
 
@@ -294,30 +287,30 @@ public:
                 continue;
             }
 
-            cv::Mat UV = K * Mc;
-            float u = UV.at<float>(0);
-            float v = UV.at<float>(1);
-            float s = UV.at<float>(2);
-            u /= s;
-            v /= s;
+            cv::Mat XY = K * Mc;
+            float x = XY.at<float>(0);
+            float y = XY.at<float>(1);
+            float s = XY.at<float>(2);
+            x /= s;
+            y /= s;
 
             if (parameter.dist_coeff.empty() || parameter.dist_coeff.at<float>(0) == 0) {
-                image_point.x = u;
-                image_point.y = v;
+                image_point.x = x;
+                image_point.y = y;
             } else {
                 /*** Distort ***/
-                float uu = (u - parameter.cx()) / parameter.fx();  /* from optical center*/
-                float vv = (v - parameter.cy()) / parameter.fy();  /* from optical center*/
-                float r2 = uu * uu + vv * vv;
+                float u = (x - parameter.cx()) / parameter.fx();  /* from optical center*/
+                float v = (y - parameter.cy()) / parameter.fy();  /* from optical center*/
+                float r2 = u * u + v * v;
                 float r4 = r2 * r2;
                 float k1 = parameter.dist_coeff.at<float>(0);
                 float k2 = parameter.dist_coeff.at<float>(1);
                 float p1 = parameter.dist_coeff.at<float>(3);
                 float p2 = parameter.dist_coeff.at<float>(4);
-                uu = uu + uu * (k1 * r2 + k2 * r4 /*+ k3 * r6 */) + (2 * p1 * uu * vv) + p2 * (r2 + 2 * uu * uu);
-                vv = vv + vv * (k1 * r2 + k2 * r4 /*+ k3 * r6 */) + (2 * p2 * uu * vv) + p1 * (r2 + 2 * vv * vv);
-                image_point.x = uu * parameter.fx() + parameter.cx();
-                image_point.y = vv * parameter.fy() + parameter.cy();
+                u = u + u * (k1 * r2 + k2 * r4 /*+ k3 * r6 */) + (2 * p1 * u * v) + p2 * (r2 + 2 * u * u);
+                v = v + v * (k1 * r2 + k2 * r4 /*+ k3 * r6 */) + (2 * p2 * u * v) + p1 * (r2 + 2 * v * v);
+                image_point.x = u * parameter.fx() + parameter.cx();
+                image_point.y = v * parameter.fy() + parameter.cy();
             }
         }
 #else
@@ -328,11 +321,11 @@ public:
     void ProjectWorld2Camera(const std::vector<cv::Point3f>& object_point_in_world_list, std::vector<cv::Point3f>& object_point_in_camera_list)
     {
         cv::Mat K = parameter.K;
-        cv::Mat R = MakeRotateMat(Rad2Deg(parameter.pitch()), Rad2Deg(parameter.yaw()), Rad2Deg(parameter.roll()));
+        cv::Mat R = MakeRotationMat(Rad2Deg(parameter.rx()), Rad2Deg(parameter.ry()), Rad2Deg(parameter.rz()));
         cv::Mat Rt = (cv::Mat_<float>(3, 4) <<
-            R.at<float>(0), R.at<float>(1), R.at<float>(2), parameter.x(),
-            R.at<float>(3), R.at<float>(4), R.at<float>(5), parameter.y(),
-            R.at<float>(6), R.at<float>(7), R.at<float>(8), parameter.z());
+            R.at<float>(0), R.at<float>(1), R.at<float>(2), parameter.tx(),
+            R.at<float>(3), R.at<float>(4), R.at<float>(5), parameter.ty(),
+            R.at<float>(6), R.at<float>(7), R.at<float>(8), parameter.tz());
 
         object_point_in_camera_list.resize(object_point_in_world_list.size());
 
@@ -354,20 +347,20 @@ public:
     {
         /*** Calculate point in ground plane (in world coordinate) ***/
         /* Main idea:*/
-        /*   s * [u, v, 1] = K * [R t] * [M, 1]  */
-        /*   s * [u, v, 1] = K * R * M + K * t */
-        /*   s * Kinv * [u, v, 1] = R * M + t */
-        /*   s * Kinv * [u, v, 1] - t = R * M */
-        /*   Rinv * (s * Kinv * [u, v, 1] - t) = M */
+        /*   s * [x, y, 1] = K * [R t] * [M, 1]  */
+        /*   s * [x, y, 1] = K * R * M + K * t */
+        /*   s * Kinv * [x, y, 1] = R * M + t */
+        /*   s * Kinv * [x, y, 1] - t = R * M */
+        /*   Rinv * (s * Kinv * [x, y, 1] - t) = M */
         /* calculate s */
-        /*   s * Rinv * Kinv * [u, v, 1] = M + R_inv * t */
+        /*   s * Rinv * Kinv * [x, y, 1] = M + R_inv * t */
         /*      where, M = (X, Y, Z), and we assume Y = 0(ground_plane) */
         /*      so , we can solve left[1] = R_inv * t[1](camera_height) */
 
         if (image_point_list.size() == 0) return;
 
         cv::Mat K = parameter.K;
-        cv::Mat R = MakeRotateMat(Rad2Deg(parameter.pitch()), Rad2Deg(parameter.yaw()), Rad2Deg(parameter.roll()));
+        cv::Mat R = MakeRotationMat(Rad2Deg(parameter.rx()), Rad2Deg(parameter.ry()), Rad2Deg(parameter.rz()));
         cv::Mat K_inv;
         cv::invert(K, K_inv);
         cv::Mat R_inv;
@@ -387,24 +380,24 @@ public:
             const auto& image_point = image_point_list[i];
             auto& object_point = object_point_list[i];
 
-            float u = image_point_undistort[i].x;
-            float v = image_point_undistort[i].y;
-            if (v < EstimateVanishmentY()) {
+            float x = image_point_undistort[i].x;
+            float y = image_point_undistort[i].y;
+            if (y < EstimateVanishmentY()) {
                 object_point.x = 999;
                 object_point.y = 999;
                 object_point.z = 999;
                 continue;
             }
 
-            cv::Mat UV = (cv::Mat_<float>(3, 1) << u, v, 1);
+            cv::Mat XY = (cv::Mat_<float>(3, 1) << x, y, 1);
 
             /* calculate s */
-            cv::Mat LEFT_WO_S = R_inv * K_inv * UV;
+            cv::Mat LEFT_WO_S = R_inv * K_inv * XY;
             cv::Mat RIGHT_WO_M = R_inv * t;         /* no need to add M because M[1] = 0 (ground plane)*/
             float s = RIGHT_WO_M.at<float>(1) / LEFT_WO_S.at<float>(1);
 
             /* calculate M */
-            cv::Mat TEMP = R_inv * (s * K_inv * UV - t);
+            cv::Mat TEMP = R_inv * (s * K_inv * XY - t);
 
             object_point.x = TEMP.at<float>(0);
             object_point.y = TEMP.at<float>(1);
@@ -413,7 +406,7 @@ public:
         }
     }
 
-    void ProjectImage2PosInCamera(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
+    void ProjectImage2Camera(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
     {
         if (z_list.size() != parameter.width * parameter.height) {
             printf("[ProjectImage2PosInCamera] Invalid z_list size\n");
@@ -423,8 +416,8 @@ public:
         /*** Generate the original image point mat ***/
         /* todo: no need to generate every time */
         std::vector<cv::Point2f> image_point_list;
-        for (int32_t y = 0; y < parameter.height; y += 1) {
-            for (int32_t x = 0; x < parameter.width; x += 1) {
+        for (int32_t y = 0; y < parameter.height; y++) {
+            for (int32_t x = 0; x < parameter.width; x++) {
                 image_point_list.push_back(cv::Point2f(float(x), float(y)));
             }
         }
@@ -438,18 +431,21 @@ public:
         }
 
         object_point_list.resize(image_point_list.size());
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
         for (int32_t i = 0; i < object_point_list.size(); i++) {
             const auto& image_point = image_point_list[i];
             const auto& Zc = z_list[i];
             auto& object_point = object_point_list[i];
 
-            float u = image_point_undistort[i].x;
-            float v = image_point_undistort[i].y;
+            float x = image_point_undistort[i].x;
+            float y = image_point_undistort[i].y;
 
-            float x_from_center = u - parameter.cx();
-            float y_from_center = v - parameter.cy();
-            float Xc = Zc * x_from_center / parameter.fx();
-            float Yc = Zc * y_from_center / parameter.fy();
+            float u = x - parameter.cx();
+            float v = y - parameter.cy();
+            float Xc = Zc * u / parameter.fx();
+            float Yc = Zc * v / parameter.fy();
             object_point.x = Xc;
             object_point.y = Yc;
             object_point.z = Zc;
@@ -476,14 +472,14 @@ public:
         float cy = parameter.cy();
         //float fy = parameter.K_new.at<float>(4);
         //float cy = parameter.K_new.at<float>(5);
-        float px_from_center = std::tan(parameter.pitch()) * fy;
+        float px_from_center = std::tan(parameter.rx()) * fy;
         float vanishment_y = cy - px_from_center;
         return static_cast<int32_t>(vanishment_y);
     }
 
     int32_t EstimateVanishmentX()
     {
-        float px_from_center = std::tan(parameter.yaw()) * parameter.fx();
+        float px_from_center = std::tan(parameter.ry()) * parameter.fx();
         float vanishment_x = parameter.cx() - px_from_center;
         return static_cast<int32_t>(vanishment_x);
     }

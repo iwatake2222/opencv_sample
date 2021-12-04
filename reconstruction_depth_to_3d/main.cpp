@@ -202,7 +202,7 @@ int main(int argc, char* argv[])
     while(true) {
         /* Convert px,py,depth(Zc) -> Xc,Yc,Zc(in camera_2d_to_3d)(=Xw,Yw,Zw) */
         std::vector<cv::Point3f> object_point_list;
-        camera_2d_to_3d.ProjectImage2PosInCamera(depth_list, object_point_list);
+        camera_2d_to_3d.ProjectImage2Camera(depth_list, object_point_list);
 
         /* Project 3D to 2D(new image) */
         std::vector<cv::Point2f> image_point_list;

@@ -61,7 +61,7 @@ static void loop_main(const cv::Mat& image_org)
         };
 
         cv::Mat mat_transform = cv::getPerspectiveTransform(selecting_point_list.data(), dst_point_list);
-        cv::Mat mat_output = cv::Mat(cv::Size(width, height), CV_8UC3, cv::Scalar(70, 70, 70));
+        cv::Mat mat_output = cv::Mat(cv::Size(static_cast<int32_t>(width), static_cast<int32_t>(height)), CV_8UC3, cv::Scalar(70, 70, 70));
         cv::warpPerspective(image_org, mat_output, mat_transform, mat_output.size(), cv::INTER_LINEAR, cv::BORDER_TRANSPARENT);
 
         cvui::imshow(kWindowOutput, mat_output);
