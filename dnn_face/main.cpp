@@ -73,14 +73,14 @@ void EstimateHeadPose(cv::Mat& image, const FaceDetection::Landmark& landmark)
 
     cv::Mat rvec = cv::Mat_<float>(3, 1);
     cv::Mat tvec = cv::Mat_<float>(3, 1);
-    cv::solvePnP(face_object_point_for_pnp_list, face_image_point_list, camera.parameter.K, camera.parameter.dist_coeff, rvec, tvec, false, cv::SOLVEPNP_ITERATIVE);
+    cv::solvePnP(face_object_point_for_pnp_list, face_image_point_list, camera.K, camera.dist_coeff, rvec, tvec, false, cv::SOLVEPNP_ITERATIVE);
     char text[128];
     snprintf(text, sizeof(text), "Pitch = %-+4.0f, Yaw = %-+4.0f, Roll = %-+4.0f", Rad2Deg(rvec.at<float>(0, 0)), Rad2Deg(rvec.at<float>(1, 0)), Rad2Deg(rvec.at<float>(2, 0)));
     CommonHelper::DrawText(image, text, cv::Point(10, 10), 0.7, 3, cv::Scalar(0, 0, 0), cv::Scalar(255, 255, 255), false);
     
     std::vector<cv::Point3f> nose_end_point3D = { { 0.0f, 0.0f, 500.0f } };
     std::vector<cv::Point2f> nose_end_point2D;
-    cv::projectPoints(nose_end_point3D, rvec, tvec, camera.parameter.K, camera.parameter.dist_coeff, nose_end_point2D);
+    cv::projectPoints(nose_end_point3D, rvec, tvec, camera.K, camera.dist_coeff, nose_end_point2D);
     cv::arrowedLine(image, face_image_point_list[0], nose_end_point2D[0], cv::Scalar(0, 255, 0), 5);
 
     /* Calculate Euler Angle */
@@ -130,7 +130,7 @@ void EstimateHeadPose(cv::Mat& image, const FaceDetection::Landmark& landmark)
     CameraModel::RotateObject(Rad2Deg(rvec.ptr<float>()[0]), Rad2Deg(rvec.ptr<float>()[1]), Rad2Deg(rvec.ptr<float>()[2]), object_point_list);
 
     std::vector<cv::Point2f> image_point_list;
-    cv::projectPoints(object_point_list, camera.parameter.rvec, tvec, camera.parameter.K, camera.parameter.dist_coeff, image_point_list);
+    cv::projectPoints(object_point_list, camera.rvec, tvec, camera.K, camera.dist_coeff, image_point_list);
 
     cv::Point2f pts1[] = { cv::Point2f(0, 0), cv::Point2f(image_icon.cols - 1.0f, 0) , cv::Point2f(image_icon.cols - 1.0f, image_icon.rows - 1.0f) , cv::Point2f(0, image_icon.rows - 1.0f) };
     cv::Mat mat_affine = cv::getPerspectiveTransform(pts1, &image_point_list[0]);
@@ -171,9 +171,9 @@ int main(int argc, char *argv[])
         if (image_input.empty()) break;
 
         if (frame_cnt == 0) {
-            camera.parameter.SetIntrinsic(image_input.cols, image_input.rows, CameraModel::FocalLength(image_input.cols, kFovDeg));
-            camera.parameter.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
-            camera.parameter.SetExtrinsic(
+            camera.SetIntrinsic(image_input.cols, image_input.rows, FocalLength(image_input.cols, kFovDeg));
+            camera.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
+            camera.SetExtrinsic(
                 { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
                 { 0.0f, 0.0f, 0.0f }, true);   /* tvec (in world coordinate) */
         }

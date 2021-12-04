@@ -45,15 +45,15 @@ static std::vector<cv::Point2f> selecting_point_list;
 /*** Function ***/
 void ResetCameraPose()
 {
-    camera.parameter.SetExtrinsic(
+    camera.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
         { 0.0f, -1.5f, 0.0f }, true);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
 }
 
 void ResetCamera(int32_t width, int32_t height)
 {
-    camera.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kFovDeg));
-    camera.parameter.SetDist({ -0.1f, 0.01f, -0.005f, -0.001f, 0.0f });
+    camera.SetIntrinsic(width, height, FocalLength(width, kFovDeg));
+    camera.SetDist({ -0.1f, 0.01f, -0.005f, -0.001f, 0.0f });
     ResetCameraPose();
 }
 
@@ -82,7 +82,7 @@ static void loop_main(const cv::Mat& image_org)
             }
         }
         std::vector<cv::Point2f> image_point_list;
-        cv::projectPoints(original_object_point_list, camera.parameter.rvec, camera.parameter.tvec, camera.parameter.K, camera.parameter.dist_coeff, image_point_list);
+        cv::projectPoints(original_object_point_list, camera.rvec, camera.tvec, camera.K, camera.dist_coeff, image_point_list);
         image = cv::Mat(kHeight, kWidth, CV_8UC3, cv::Scalar(70, 70, 70));
 
         /* Re-convert image point to object poitn(world) */
@@ -134,25 +134,25 @@ static void loop_param()
         }
 
         cvui::text("Camera Parameter (Intrinsic)");
-        MAKE_GUI_SETTING_FLOAT(camera.parameter.fx(), "Focal Length", 10.0f, "%.0Lf", 0.0f, 1000.0f);
-        camera.parameter.fy() = camera.parameter.fx();
-        camera.parameter.UpdateNewCameraMatrix();
+        MAKE_GUI_SETTING_FLOAT(camera.fx(), "Focal Length", 10.0f, "%.0Lf", 0.0f, 1000.0f);
+        camera.fy() = camera.fx();
+        camera.UpdateNewCameraMatrix();
 
         cvui::text("Camera Parameter (Extrinsic)");
-        float x = -camera.parameter.tx();
-        float y = -camera.parameter.ty();
-        float z = -camera.parameter.tz();
+        float x = -camera.tx();
+        float y = -camera.ty();
+        float z = -camera.tz();
         MAKE_GUI_SETTING_FLOAT(y, "Height", 0.5f, "%.1Lf", 0.0f, -5.0f);
-        camera.parameter.SetCameraPos(x, y, z, false);
+        camera.SetCameraPos(x, y, z, false);
 
         cvui::text("Camera Parameter (Extrinsic)");
-        float pitch_deg = Rad2Deg(camera.parameter.rx());
+        float pitch_deg = Rad2Deg(camera.rx());
         MAKE_GUI_SETTING_FLOAT(pitch_deg, "Pitch", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        float yaw_deg = Rad2Deg(camera.parameter.ry());
+        float yaw_deg = Rad2Deg(camera.ry());
         MAKE_GUI_SETTING_FLOAT(yaw_deg, "Yaw", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        float roll_deg = Rad2Deg(camera.parameter.rz());
+        float roll_deg = Rad2Deg(camera.rz());
         MAKE_GUI_SETTING_FLOAT(roll_deg, "Roll", 1.0f, "%.0Lf", -90.0f, 90.0f);
-        camera.parameter.SetCameraAngle(pitch_deg, yaw_deg, roll_deg);
+        camera.SetCameraAngle(pitch_deg, yaw_deg, roll_deg);
     }
     cvui::endColumn();
 
@@ -177,46 +177,46 @@ static void TreatKeyInputMain(int32_t key)
     key &= 0xFF;
     switch (key) {
     case 'w':
-        camera.parameter.MoveCameraPos(0, 0, kIncPosPerFrame, false);
+        camera.MoveCameraPos(0, 0, kIncPosPerFrame, false);
         break;
     case 'W':
-        camera.parameter.MoveCameraPos(0, 0, kIncPosPerFrame, true);
+        camera.MoveCameraPos(0, 0, kIncPosPerFrame, true);
         break;
     case 's':
-        camera.parameter.MoveCameraPos(0, 0, -kIncPosPerFrame, false);
+        camera.MoveCameraPos(0, 0, -kIncPosPerFrame, false);
         break;
     case 'S':
-        camera.parameter.MoveCameraPos(0, 0, -kIncPosPerFrame, true);
+        camera.MoveCameraPos(0, 0, -kIncPosPerFrame, true);
         break;
     case 'a':
-        camera.parameter.MoveCameraPos(-kIncPosPerFrame, 0, 0, false);
+        camera.MoveCameraPos(-kIncPosPerFrame, 0, 0, false);
         break;
     case 'A':
-        camera.parameter.MoveCameraPos(-kIncPosPerFrame, 0, 0, true);
+        camera.MoveCameraPos(-kIncPosPerFrame, 0, 0, true);
         break;
     case 'd':
-        camera.parameter.MoveCameraPos(kIncPosPerFrame, 0, 0, false);
+        camera.MoveCameraPos(kIncPosPerFrame, 0, 0, false);
         break;
     case 'D':
-        camera.parameter.MoveCameraPos(kIncPosPerFrame, 0, 0, true);
+        camera.MoveCameraPos(kIncPosPerFrame, 0, 0, true);
         break;
     case 'z':
-        camera.parameter.MoveCameraPos(0, -kIncPosPerFrame, 0, false);
+        camera.MoveCameraPos(0, -kIncPosPerFrame, 0, false);
         break;
     case 'Z':
-        camera.parameter.MoveCameraPos(0, -kIncPosPerFrame, 0, true);
+        camera.MoveCameraPos(0, -kIncPosPerFrame, 0, true);
         break;
     case 'x':
-        camera.parameter.MoveCameraPos(0, kIncPosPerFrame, 0, false);
+        camera.MoveCameraPos(0, kIncPosPerFrame, 0, false);
         break;
     case 'X':
-        camera.parameter.MoveCameraPos(0, kIncPosPerFrame, 0, true);
+        camera.MoveCameraPos(0, kIncPosPerFrame, 0, true);
         break;
     case 'q':
-        camera.parameter.RotateCameraAngle(0, 0, 2.0f);
+        camera.RotateCameraAngle(0, 0, 2.0f);
         break;
     case 'e':
-        camera.parameter.RotateCameraAngle(0, 0, -2.0f);
+        camera.RotateCameraAngle(0, 0, -2.0f);
         break;
     }
 }

@@ -46,17 +46,17 @@ static CameraModel camera_3d_to_2d;
 /*** Function ***/
 void initialize_camera(int32_t width, int32_t height)
 {
-    camera_2d_to_3d.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kCamera2d3dFovDeg));
-    camera_2d_to_3d.parameter.SetDist({ -0.1f, 0.01f, -0.005f, -0.001f, 0.0f });
-    //camera_2d_to_3d.parameter.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
-    camera_2d_to_3d.parameter.SetExtrinsic(
+    camera_2d_to_3d.SetIntrinsic(width, height, FocalLength(width, kCamera2d3dFovDeg));
+    camera_2d_to_3d.SetDist({ -0.1f, 0.01f, -0.005f, -0.001f, 0.0f });
+    //camera_2d_to_3d.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
+    camera_2d_to_3d.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
         { 0.0f, 0.0f, 0.0f }, true);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
                                        /* tvec must be zero, so that calculated Mc(Location in camera cooridinate) becomes the same as Mw(location in world coordinate), and can be used to convert from 3D to 2D later */
 
-    camera_3d_to_2d.parameter.SetIntrinsic(kCamera3d2dWidth, kCamera3d2dHeight, CameraModel::FocalLength(kCamera3d2dWidth, kCamera3d2dFovDeg));
-    camera_3d_to_2d.parameter.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
-    camera_3d_to_2d.parameter.SetExtrinsic(
+    camera_3d_to_2d.SetIntrinsic(kCamera3d2dWidth, kCamera3d2dHeight, FocalLength(kCamera3d2dWidth, kCamera3d2dFovDeg));
+    camera_3d_to_2d.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
+    camera_3d_to_2d.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
         { 0.0f, 0.0f, 0.0f }, true);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
 
@@ -77,7 +77,7 @@ static void CallbackMouseMain(int32_t event, int32_t x, int32_t y, int32_t flags
         if (s_drag_previous_point.x != kInvalidValue) {
             float delta_yaw = kIncAnglePerPx * (x - s_drag_previous_point.x);
             float pitch_delta = -kIncAnglePerPx * (y - s_drag_previous_point.y);
-            camera_3d_to_2d.parameter.RotateCameraAngle(pitch_delta, delta_yaw, 0);
+            camera_3d_to_2d.RotateCameraAngle(pitch_delta, delta_yaw, 0);
             s_drag_previous_point.x = x;
             s_drag_previous_point.y = y;
         }
@@ -94,46 +94,46 @@ static void TreatKeyInputMain(int32_t key)
     key &= 0xFF;
     switch (key) {
     case 'w':
-        camera_3d_to_2d.parameter.MoveCameraPos(0, 0, kIncPosPerFrame, false);
+        camera_3d_to_2d.MoveCameraPos(0, 0, kIncPosPerFrame, false);
         break;
     case 'W':
-        camera_3d_to_2d.parameter.MoveCameraPos(0, 0, kIncPosPerFrame, true);
+        camera_3d_to_2d.MoveCameraPos(0, 0, kIncPosPerFrame, true);
         break;
     case 's':
-        camera_3d_to_2d.parameter.MoveCameraPos(0, 0, -kIncPosPerFrame, false);
+        camera_3d_to_2d.MoveCameraPos(0, 0, -kIncPosPerFrame, false);
         break;
     case 'S':
-        camera_3d_to_2d.parameter.MoveCameraPos(0, 0, -kIncPosPerFrame, true);
+        camera_3d_to_2d.MoveCameraPos(0, 0, -kIncPosPerFrame, true);
         break;
     case 'a':
-        camera_3d_to_2d.parameter.MoveCameraPos(-kIncPosPerFrame, 0, 0, false);
+        camera_3d_to_2d.MoveCameraPos(-kIncPosPerFrame, 0, 0, false);
         break;
     case 'A':
-        camera_3d_to_2d.parameter.MoveCameraPos(-kIncPosPerFrame, 0, 0, true);
+        camera_3d_to_2d.MoveCameraPos(-kIncPosPerFrame, 0, 0, true);
         break;
     case 'd':
-        camera_3d_to_2d.parameter.MoveCameraPos(kIncPosPerFrame, 0, 0, false);
+        camera_3d_to_2d.MoveCameraPos(kIncPosPerFrame, 0, 0, false);
         break;
     case 'D':
-        camera_3d_to_2d.parameter.MoveCameraPos(kIncPosPerFrame, 0, 0, true);
+        camera_3d_to_2d.MoveCameraPos(kIncPosPerFrame, 0, 0, true);
         break;
     case 'z':
-        camera_3d_to_2d.parameter.MoveCameraPos(0, -kIncPosPerFrame, 0, false);
+        camera_3d_to_2d.MoveCameraPos(0, -kIncPosPerFrame, 0, false);
         break;
     case 'Z':
-        camera_3d_to_2d.parameter.MoveCameraPos(0, -kIncPosPerFrame, 0, true);
+        camera_3d_to_2d.MoveCameraPos(0, -kIncPosPerFrame, 0, true);
         break;
     case 'x':
-        camera_3d_to_2d.parameter.MoveCameraPos(0, kIncPosPerFrame, 0, false);
+        camera_3d_to_2d.MoveCameraPos(0, kIncPosPerFrame, 0, false);
         break;
     case 'X':
-        camera_3d_to_2d.parameter.MoveCameraPos(0, kIncPosPerFrame, 0, true);
+        camera_3d_to_2d.MoveCameraPos(0, kIncPosPerFrame, 0, true);
         break;
     case 'q':
-        camera_3d_to_2d.parameter.RotateCameraAngle(0, 0, 2.0f);
+        camera_3d_to_2d.RotateCameraAngle(0, 0, 2.0f);
         break;
     case 'e':
-        camera_3d_to_2d.parameter.RotateCameraAngle(0, 0, -2.0f);
+        camera_3d_to_2d.RotateCameraAngle(0, 0, -2.0f);
         break;
     }
 }
@@ -221,7 +221,7 @@ int main(int argc, char* argv[])
         });
 
         /* Draw the result */
-        cv::Mat mat_output = cv::Mat(camera_3d_to_2d.parameter.height, camera_3d_to_2d.parameter.width, CV_8UC3, cv::Scalar(0, 0, 0));
+        cv::Mat mat_output = cv::Mat(camera_3d_to_2d.height, camera_3d_to_2d.width, CV_8UC3, cv::Scalar(0, 0, 0));
         for (int32_t i : indices_depth) {
             if (CheckIfPointInArea(image_point_list[i], mat_output.size())) {
                 cv::circle(mat_output, image_point_list[i], 4, image_input.at<cv::Vec3b>(i), -1);
