@@ -33,10 +33,10 @@ limitations under the License.
 
 /*** Macro ***/
 static constexpr char kInputImageFilename[] = RESOURCE_DIR"/room_02.jpg";
-static constexpr float   kCamera2d3dFovDeg = 120.0f;
-static constexpr int32_t kCamera3d2dWidth = 1280;
-static constexpr int32_t kCamera3d2dHeight = 720;
-static constexpr float   kCamera3d2dFovDeg = 100.0f;
+static constexpr float   kCamera2d3dFovDeg = 80.0f;
+static constexpr int32_t kCamera3d2dWidth = 640;
+static constexpr int32_t kCamera3d2dHeight = 480;
+static constexpr float   kCamera3d2dFovDeg = 80.0f;
 #define NORMALIZE_BY_255
 
 /*** Global variable ***/
@@ -47,7 +47,8 @@ static CameraModel camera_3d_to_2d;
 void initialize_camera(int32_t width, int32_t height)
 {
     camera_2d_to_3d.parameter.SetIntrinsic(width, height, CameraModel::FocalLength(width, kCamera2d3dFovDeg));
-    camera_2d_to_3d.parameter.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
+    camera_2d_to_3d.parameter.SetDist({ -0.1f, 0.01f, -0.005f, -0.001f, 0.0f });
+    //camera_2d_to_3d.parameter.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
     camera_2d_to_3d.parameter.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
         { 0.0f, 0.0f, 0.0f }, true);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
@@ -199,11 +200,11 @@ int main(int argc, char* argv[])
         }
     }
 
-    while(true) {
-        /* Convert px,py,depth(Zc) -> Xc,Yc,Zc(in camera_2d_to_3d)(=Xw,Yw,Zw) */
-        std::vector<cv::Point3f> object_point_list;
-        camera_2d_to_3d.ProjectImage2Camera(depth_list, object_point_list);
+    /* Convert px,py,depth(Zc) -> Xc,Yc,Zc(in camera_2d_to_3d)(=Xw,Yw,Zw) */
+    std::vector<cv::Point3f> object_point_list;
+    camera_2d_to_3d.ProjectImage2Camera(depth_list, object_point_list);
 
+    while(true) {
         /* Project 3D to 2D(new image) */
         std::vector<cv::Point2f> image_point_list;
         camera_3d_to_2d.ProjectWorld2Image(object_point_list, image_point_list);
