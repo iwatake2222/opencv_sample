@@ -4,8 +4,8 @@
 - 3D空間をマウス操作で自由に移動できるコードを作ります。UnityやOpenGLのデモでよくありそうなやつですが、ここではOpenCVを使います
 - ピンホールカメラモデルを理解しながら、自分で変換式を書き、3D空間→2D平面へ投影します。OpenCVは行列計算と結果の描画にだけ使います
 
+https://user-images.githubusercontent.com/11009876/144704158-cf3e2409-eba7-4e4d-aace-ac85c3072003.mp4
 
-[demo_video]
 
 ## 環境
 ### 環境 (Windows)
