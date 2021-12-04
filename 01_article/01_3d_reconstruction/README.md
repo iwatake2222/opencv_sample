@@ -5,7 +5,8 @@
 - ピンホールカメラモデルについて記した、下記の記事を理解している前提で記載します
     - https://github.com/iwatake2222/opencv_sample/tree/master/01_article/00_camera_model
 
-[demo_video]
+https://user-images.githubusercontent.com/11009876/144705856-8714558e-610f-4087-a194-11e712517b9f.mp4
+
 
 ## 環境
 ### 環境 (Windows)
