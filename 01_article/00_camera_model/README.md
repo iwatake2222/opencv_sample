@@ -321,19 +321,19 @@ $
 
 ```cpp:camera_model.h
 class CameraModel {
-private:
-    /* Intrinsic parameters */
+public:
+    /*** Intrinsic parameters ***/
     /* float, 3 x 3 */
     cv::Mat K;
 
     int32_t width;
     int32_t height;
 
-    /* Extrinsic parameters */
-    /* float, 3 x 1, pitch,  yaw, roll [rad] */
+    /*** Extrinsic parameters ***/
+    /* float, 3 x 1, pitch(rx),  yaw(ry), roll(rz) [rad] */
     cv::Mat rvec;
 
-    /* float, 3 x 1, (X, Y, Z): horizontal, vertical, depth (Camera location: Ow - Oc in camera coordinate) */
+    /* float, 3 x 1, (tx, ty, tz): horizontal, vertical, depth (Camera location: Ow - Oc in camera coordinate) */
     cv::Mat tvec;
 
 public:
@@ -343,29 +343,35 @@ public:
         SetExtrinsic({ 0, 0, 0 }, { 0, 0, 0 });
     }
 
-    void SetIntrinsic(int32_t _width, int32_t _height, float focal_length) {
-        width = _width;
-        height = _height;
-        K = (cv::Mat_<float>(3, 3) <<
-            focal_length,            0,  width / 2.f,
+    /*** Methods for camera parameters ***/
+    void SetIntrinsic(int32_t width, int32_t height, float focal_length) {
+        this->width = width;
+        this->height = height;
+        this->K = (cv::Mat_<float>(3, 3) <<
+             focal_length,            0,  width / 2.f,
                         0, focal_length, height / 2.f,
                         0,            0,            1);
     }
 
-    void SetExtrinsic(const std::array<float, 3>& r_deg, const std::array<float, 3>& t, bool is_t_on_world = true)
+    void SetExtrinsic(const std::array<float, 3>& rvec_deg, const std::array<float, 3>& tvec, bool is_t_on_world = true)
     {
-        /*
-        is_t_on_world == true: tvec = T (Oc - Ow in world coordinate)
-        is_t_on_world == false: tvec = tvec (Ow - Oc in camera coordinate)
-        */
-        rvec = (cv::Mat_<float>(3, 1) << Deg2Rad(r_deg[0]), Deg2Rad(r_deg[1]), Deg2Rad(r_deg[2]));
-        tvec = (cv::Mat_<float>(3, 1) << t[0], t[1], t[2]);
+        this->rvec = (cv::Mat_<float>(3, 1) << Deg2Rad(rvec_deg[0]), Deg2Rad(rvec_deg[1]), Deg2Rad(rvec_deg[2]));
+        this->tvec = (cv::Mat_<float>(3, 1) << tvec[0], tvec[1], tvec[2]);
 
+        /*
+            is_t_on_world == true: tvec = T (Oc - Ow in world coordinate)
+            is_t_on_world == false: tvec = tvec (Ow - Oc in camera coordinate)
+        */
         if (is_t_on_world) {
-            cv::Mat R;
-            cv::Rodrigues(rvec, R);
-            tvec = -R * tvec;   /* t = -RT */
+            cv::Mat R = MakeRotationMat(Rad2Deg(rx()), Rad2Deg(ry()), Rad2Deg(rz()));
+            this->tvec = -R * this->tvec;   /* t = -RT */
         }
+    }
+
+    void GetExtrinsic(std::array<float, 3>& rvec_deg, std::array<float, 3>& tvec)
+    {
+        rvec_deg = { Rad2Deg(this->rvec.at<float>(0)), Rad2Deg(this->rvec.at<float>(1)) , Rad2Deg(this->rvec.at<float>(2)) };
+        tvec = { this->tvec.at<float>(0), this->tvec.at<float>(1), this->tvec.at<float>(2) };
     }
 };
 ```
@@ -380,16 +386,16 @@ class CameraModel {
     略
     void ProjectWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
     {
-        /*** Projection ***/
         /* s[x, y, 1] = K * [R t] * [M, 1] = K * M_from_cam */
-        cv::Mat R;
-        cv::Rodrigues(rvec, R);
+        cv::Mat K = this->K;
+        cv::Mat R = MakeRotationMat(Rad2Deg(this->rx()), Rad2Deg(this->ry()), Rad2Deg(this->rz()));
         cv::Mat Rt = (cv::Mat_<float>(3, 4) <<
-            R.at<float>(0), R.at<float>(1), R.at<float>(2), tvec.at<float>(0),
-            R.at<float>(3), R.at<float>(4), R.at<float>(5), tvec.at<float>(1),
-            R.at<float>(6), R.at<float>(7), R.at<float>(8), tvec.at<float>(2));
+            R.at<float>(0), R.at<float>(1), R.at<float>(2), this->tx(),
+            R.at<float>(3), R.at<float>(4), R.at<float>(5), this->ty(),
+            R.at<float>(6), R.at<float>(7), R.at<float>(8), this->tz());
 
         image_point_list.resize(object_point_list.size());
+
         for (int32_t i = 0; i < object_point_list.size(); i++) {
             const auto& object_point = object_point_list[i];
             auto& image_point = image_point_list[i];
@@ -402,10 +408,10 @@ class CameraModel {
                 continue;
             }
 
-            cv::Mat xy = K * Mc;
-            float x = xy.at<float>(0);
-            float y = xy.at<float>(1);
-            float s = xy.at<float>(2);
+            cv::Mat XY = K * Mc;
+            float x = XY.at<float>(0);
+            float y = XY.at<float>(1);
+            float s = XY.at<float>(2);
             x /= s;
             y /= s;
 
