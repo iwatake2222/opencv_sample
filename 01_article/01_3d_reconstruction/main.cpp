@@ -43,7 +43,7 @@ static CameraModel camera_2d_to_3d;
 static CameraModel camera_3d_to_2d;
 
 /*** Function ***/
-void initialize_camera(int32_t width, int32_t height)
+void InitializeCamera(int32_t width, int32_t height)
 {
     camera_2d_to_3d.SetIntrinsic(width, height, FocalLength(width, kCamera2d3dFovDeg));
     camera_2d_to_3d.SetExtrinsic(
@@ -143,20 +143,16 @@ static bool CheckIfPointInArea(const cv::Point& p, const cv::Size& r)
 
 int main(int argc, char* argv[])
 {
-    /* Initialize Model */
-    DepthEngine depth_engine;
-    depth_engine.Initialize("");
-
-
     /* Read image */
     cv::Mat image_input = cv::imread(kInputImageFilename);
     if (image_input.empty()) return -1;
-
     cv::resize(image_input, image_input, cv::Size(), 0.5, 0.5);
 
-    initialize_camera(image_input.cols, image_input.rows);
+    InitializeCamera(image_input.cols, image_input.rows);
 
     /* Estimate depth */
+    DepthEngine depth_engine;
+    depth_engine.Initialize("");
     cv::Mat mat_depth;
     depth_engine.Process(image_input, mat_depth);
 

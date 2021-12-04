@@ -236,7 +236,7 @@ public:
     void ProjectImage2Camera(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
     {
         if (z_list.size() != this->width * this->height) {
-            printf("[ProjectImage2PosInCamera] Invalid z_list size\n");
+            printf("[ProjectImage2Camera] Invalid z_list size\n");
             return;
         }
 

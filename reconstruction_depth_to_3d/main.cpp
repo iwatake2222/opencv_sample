@@ -44,7 +44,7 @@ static CameraModel camera_2d_to_3d;
 static CameraModel camera_3d_to_2d;
 
 /*** Function ***/
-void initialize_camera(int32_t width, int32_t height)
+void InitializeCamera(int32_t width, int32_t height)
 {
     camera_2d_to_3d.SetIntrinsic(width, height, FocalLength(width, kCamera2d3dFovDeg));
     camera_2d_to_3d.SetDist({ -0.1f, 0.01f, -0.005f, -0.001f, 0.0f });
@@ -169,7 +169,7 @@ int main(int argc, char* argv[])
 
     cv::resize(image_input, image_input, cv::Size(), 0.5, 0.5);
 
-    initialize_camera(image_input.cols, image_input.rows);
+    InitializeCamera(image_input.cols, image_input.rows);
 
     /* Estimate depth */
     cv::Mat mat_depth;
