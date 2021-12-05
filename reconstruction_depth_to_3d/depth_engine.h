@@ -30,9 +30,9 @@ public:
     typedef std::array<cv::Point, 5> Landmark;
 
 private:
-    static constexpr char kModelFilename[] = RESOURCE_DIR"/model/midasv2_small_256x256.onnx";
-    static constexpr int32_t kModelInputWidth = 256;
-    static constexpr int32_t kModelInputHeight = 256;
+    static constexpr char kModelFilename[] = RESOURCE_DIR"/model/ldrn_kitti_resnext101_pretrained_data_grad_480x640.onnx";
+    static constexpr int32_t kModelInputWidth = 640;
+    static constexpr int32_t kModelInputHeight = 480;
     const std::array<float, 3> kMeanList = { 0.485f, 0.456f, 0.406f };
     const std::array<float, 3> kNormList = { 0.229f, 0.224f, 0.225f };
 

@@ -32,12 +32,12 @@ limitations under the License.
 #include "camera_model.h"
 
 /*** Macro ***/
-static constexpr char kInputImageFilename[] = RESOURCE_DIR"/room_02.jpg";
+static constexpr char kInputImageFilename[] = RESOURCE_DIR"/dashcam_02.jpg";
 static constexpr float   kCamera2d3dFovDeg = 80.0f;
-static constexpr int32_t kCamera3d2dWidth = 640;
-static constexpr int32_t kCamera3d2dHeight = 480;
+static constexpr int32_t kCamera3d2dWidth = 1280 * 0.5;
+static constexpr int32_t kCamera3d2dHeight = 720 * 0.5;
 static constexpr float   kCamera3d2dFovDeg = 80.0f;
-#define NORMALIZE_BY_255
+//#define NORMALIZE_BY_255
 
 /*** Global variable ***/
 static CameraModel camera_2d_to_3d;
@@ -47,7 +47,7 @@ static CameraModel camera_3d_to_2d;
 void InitializeCamera(int32_t width, int32_t height)
 {
     camera_2d_to_3d.SetIntrinsic(width, height, FocalLength(width, kCamera2d3dFovDeg));
-    camera_2d_to_3d.SetDist({ -0.1f, 0.01f, -0.005f, -0.001f, 0.0f });
+    //camera_2d_to_3d.SetDist({ -0.1f, 0.01f, -0.005f, -0.001f, 0.0f });
     //camera_2d_to_3d.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
     camera_2d_to_3d.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
@@ -86,9 +86,9 @@ static void CallbackMouseMain(int32_t event, int32_t x, int32_t y, int32_t flags
 static void TreatKeyInputMain(int32_t key)
 {
 #ifdef NORMALIZE_BY_255
-    static constexpr float kIncPosPerFrame = 10.0f;
+    static constexpr float kIncPosPerFrame = 1.0f;
 #else
-    static constexpr float kIncPosPerFrame = 0.0005f;
+    static constexpr float kIncPosPerFrame = 1.0f;
 #endif
     key &= 0xFF;
     switch (key) {
@@ -166,7 +166,7 @@ int main(int argc, char* argv[])
     }
     if (image_input.empty()) return -1;
 
-    cv::resize(image_input, image_input, cv::Size(), 0.5, 0.5);
+    cv::resize(image_input, image_input, cv::Size(), 0.8, 0.8);
 
     InitializeCamera(image_input.cols, image_input.rows);
 
@@ -178,7 +178,7 @@ int main(int argc, char* argv[])
     cv::Mat mat_depth_normlized255;
     depth_engine.NormalizeMinMax(mat_depth, mat_depth_normlized255);
     cv::Mat image_depth;
-    cv::applyColorMap(mat_depth_normlized255, image_depth, cv::COLORMAP_JET);
+    cv::applyColorMap(mat_depth_normlized255, image_depth, cv::COLORMAP_PLASMA);
     cv::resize(image_depth, image_depth, image_input.size());
 
     /* Normalize depth for 3D reconstruction */
@@ -223,7 +223,7 @@ int main(int argc, char* argv[])
         cv::Mat mat_output = cv::Mat(camera_3d_to_2d.height, camera_3d_to_2d.width, CV_8UC3, cv::Scalar(0, 0, 0));
         for (int32_t i : indices_depth) {
             if (CheckIfPointInArea(image_point_list[i], mat_output.size())) {
-                cv::circle(mat_output, image_point_list[i], 4, image_input.at<cv::Vec3b>(i), -1);
+                cv::circle(mat_output, image_point_list[i], 2, image_input.at<cv::Vec3b>(i), -1);
             }
         }
 

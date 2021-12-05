@@ -73,7 +73,7 @@ bool DepthEngine::Process(const cv::Mat& image_input, cv::Mat& mat_depth)
 
     /* Inference */
     std::vector<cv::Mat> output_mat_list;
-    Inference(blob_input, { "797" }, output_mat_list);
+    Inference(blob_input, { "2499" }, output_mat_list);
 
     /* Post Process */
     /* Inverse relative depth (Far = small Value, Near = huge value) */
@@ -95,8 +95,9 @@ bool DepthEngine::NormalizeMinMax(const cv::Mat& mat_depth, cv::Mat& mat_depth_n
     cv::minMaxLoc(mat_depth, &depth_min, &depth_max);
     double range = depth_max - depth_min;
     if (range > 0) {
-        mat_depth.convertTo(mat_depth_normalized, CV_8UC1, 255. / range, (-255. * depth_min) / range);
-        mat_depth_normalized = 255 - mat_depth_normalized;
+        mat_depth.convertTo(mat_depth_normalized, CV_8UC1, 2);
+        //mat_depth.convertTo(mat_depth_normalized, CV_8UC1, 255. / range, (-255. * depth_min) / range);
+        //mat_depth_normalized = 255 - mat_depth_normalized;
         return true;
     } else {
         return false;
@@ -111,7 +112,17 @@ bool DepthEngine::NormalizeScaleShift(const cv::Mat& mat_depth, cv::Mat& mat_dep
     ***/
     mat_depth_normalized = cv::Mat(kModelInputHeight, kModelInputWidth, CV_32FC1);
     mat_depth.convertTo(mat_depth_normalized, CV_32FC1, scale, shift);
-    mat_depth_normalized = 1.0 / mat_depth_normalized;
+    //for (int32_t y = 0; y < mat_depth_normalized.rows * 0.2; y++) {
+    //    for (int32_t x = 0; x < mat_depth_normalized.cols; x++) {
+    //        mat_depth_normalized.at<float>(y, x) = 99999;
+    //    }
+    //}
+    //for (int32_t y = mat_depth_normalized.rows * (1.0 - 0.2); y < mat_depth_normalized.rows; y++) {
+    //    for (int32_t x = 0; x < mat_depth_normalized.cols; x++) {
+    //        mat_depth_normalized.at<float>(y, x) = 99999;
+    //    }
+    //}
+    //mat_depth_normalized = 1.0 / mat_depth_normalized;
     return true;
 }
 
