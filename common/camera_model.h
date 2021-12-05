@@ -54,11 +54,11 @@ class CameraModel {
     * s[x, y, 1] = K * Mc
     *     Mc: カメラ座標上での対象物体の座標 (Xc, Yc, Zc)
     *         = [R t] * [Mw, 1]
-    * 
+    *
     * 理由: Mc = R(Mw - T) = RMw - RT = RMw + t   (t = -RT)
-    * 
+    *
     * 注意1: tはカメラ座標上でのベクトルである。そのため、Rを変更した場合はtを再計算する必要がある
-    * 
+    *
     * 注意2: 座標系は右手系。X+ = 右、Y+ = 下、Z+ = 奥  (例. カメラから見て物体が上にある場合、Ycは負値)
     ***/
 
@@ -108,9 +108,9 @@ public:
         this->width = width;
         this->height = height;
         this->K = (cv::Mat_<float>(3, 3) <<
-             focal_length,            0,  width / 2.f,
-                        0, focal_length, height / 2.f,
-                        0,            0,            1);
+            focal_length, 0, width / 2.f,
+            0, focal_length, height / 2.f,
+            0, 0, 1);
         UpdateNewCameraMatrix();
     }
 
@@ -141,10 +141,25 @@ public:
         }
     }
 
-    void GetExtrinsic(std::array<float, 3>& rvec_deg, std::array<float, 3>& tvec)
+    void GetExtrinsic(std::array<float, 3>& rvec_deg, std::array<float, 3>& tvec, bool is_t_on_world = true)
     {
         rvec_deg = { Rad2Deg(this->rvec.at<float>(0)), Rad2Deg(this->rvec.at<float>(1)) , Rad2Deg(this->rvec.at<float>(2)) };
         tvec = { this->tvec.at<float>(0), this->tvec.at<float>(1), this->tvec.at<float>(2) };
+        /*
+            is_t_on_world == true: tvec = T (Oc - Ow in world coordinate)
+            is_t_on_world == false: tvec = tvec (Ow - Oc in camera coordinate)
+        */
+        if (is_t_on_world) {
+            /* t = -RT -> T = -R^1 t */
+            cv::Mat R = MakeRotationMat(Rad2Deg(rx()), Rad2Deg(ry()), Rad2Deg(rz()));
+            cv::Mat R_inv;
+            cv::invert(R, R_inv);
+            cv::Mat T = -R_inv * this->tvec;
+            tvec = { T.at<float>(0), T.at<float>(1), T.at<float>(2) };
+        } else {
+            tvec = { this->tvec.at<float>(0), this->tvec.at<float>(1), this->tvec.at<float>(2) };
+        }
+        
     }
 
     void SetCameraPos(float tx, float ty, float tz, bool is_on_world = true)    /* Oc - Ow */
@@ -194,6 +209,14 @@ public:
     }
 
     /*** Methods for projection ***/
+    void ConvertWorld2Image(const cv::Point3f& object_point, cv::Point2f& image_point)
+    {
+        std::vector<cv::Point3f> object_point_list = { object_point };
+        std::vector<cv::Point2f> image_point_list;
+        ConvertWorld2Image(object_point_list, image_point_list);
+        image_point = image_point_list[0];
+    }
+
     void ConvertWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
     {
         /*** Mw -> Image ***/
@@ -294,7 +317,7 @@ public:
         cv::Mat R_inv;
         cv::invert(R, R_inv);
         cv::Mat t = this->tvec;
-        
+
 
         object_point_in_world_list.resize(object_point_in_camera_list.size());
 
@@ -501,7 +524,7 @@ public:
             std::cos(z_rad), -std::sin(z_rad), 0,
             std::sin(z_rad), std::cos(z_rad), 0,
             0, 0, 1);
-        
+
         cv::Mat R = R_z * R_x * R_y;
 #else
         /* Rodrigues */
