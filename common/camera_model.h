@@ -376,27 +376,34 @@ public:
         }
     }
 
-    void ConvertImage2Camera(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
+    void ConvertImage2Camera(std::vector<cv::Point2f>& image_point_list, const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
     {
         /*** Image -> Mc ***/
-        if (z_list.size() != this->width * this->height) {
-            printf("[ConvertImage2Camera] Invalid z_list size\n");
-            return;
-        }
-
-        /*** Generate the original image point mat ***/
-        /* todo: no need to generate every time */
-        std::vector<cv::Point2f> image_point_list;
-        for (int32_t y = 0; y < this->height; y++) {
-            for (int32_t x = 0; x < this->width; x++) {
-                image_point_list.push_back(cv::Point2f(float(x), float(y)));
+        if (image_point_list.size() == 0) {
+            /* Convert for all pixels on image, when image_point_list = empty */
+            if (z_list.size() != this->width * this->height) {
+                printf("[ConvertImage2Camera] Invalid z_list size\n");
+                return;
+            }
+            /* Generate the original image point mat */
+            /* todo: no need to generate every time */
+            for (int32_t y = 0; y < this->height; y++) {
+                for (int32_t x = 0; x < this->width; x++) {
+                    image_point_list.push_back(cv::Point2f(float(x), float(y)));
+                }
+            }
+        } else {
+            /* Convert for the input pixels only */
+            if (z_list.size() != image_point_list.size()) {
+                printf("[ConvertImage2Camera] Invalid z_list size\n");
+                return;
             }
         }
 
         /*** Undistort image point ***/
         std::vector<cv::Point2f> image_point_undistort;
         if (this->dist_coeff.empty() || this->dist_coeff.at<float>(0) == 0) {
-            image_point_undistort = image_point_list;
+            image_point_undistort = image_point_list;   /* todo: redundant copy. I do this just because to make code simple */
         } else {
             cv::undistortPoints(image_point_list, image_point_undistort, this->K, this->dist_coeff, this->K);    /* don't use K_new */
         }
@@ -422,16 +429,11 @@ public:
         }
     }
 
-    void ConvertImage2World(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
+    void ConvertImage2World(std::vector<cv::Point2f>& image_point_list, const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
     {
         /*** Image -> Mw ***/
-        if (z_list.size() != this->width * this->height) {
-            printf("[ConvertImage2Camera] Invalid z_list size\n");
-            return;
-        }
-
         std::vector<cv::Point3f> object_point_in_camera_list;
-        ConvertImage2Camera(z_list, object_point_in_camera_list);
+        ConvertImage2Camera(image_point_list, z_list, object_point_in_camera_list);
         ConvertCamera2World(object_point_in_camera_list, object_point_list);
     }
 
