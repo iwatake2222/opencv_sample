@@ -375,14 +375,14 @@ public:
 ```
 
 ### 変換処理を実装する
-- `ProjectWorld2Image` という関数で、`cv::Point3f` 型のMw(ワールド座標系での座標)を、`cv::Point2f` 型の画像座標系での座標に変換します。複数の点を同時に変換できるよう、vectorにしています
+- `ConvertWorld2Image` という関数で、`cv::Point3f` 型のMw(ワールド座標系での座標)を、`cv::Point2f` 型の画像座標系での座標に変換します。複数の点を同時に変換できるよう、vectorにしています
 - 行っている計算は、先ほど算出した通りのものとなります
 - が、一点だけ実装上の工夫があります。いっぺんに計算するのではなく、一度MwからMcに変換しています。そして、Zc(カメラ座標系での奥行)を確認し、カメラより後方にある点は変換しないようにしています。これをそのまま計算してしまうと、カメラの裏側にある点が変な位置に表示されてしまうためです
 
 ```cpp:camera_model.h
 class CameraModel {
     略
-    void ProjectWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
+    void ConvertWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
     {
         /* s[x, y, 1] = K * [R t] * [M, 1] = K * M_from_cam */
         cv::Mat K = this->K;
@@ -426,7 +426,7 @@ class CameraModel {
     - 地面から高さ10mの位置に、水平に設置
 - `loop_main` が毎フレームの処理です
     - ワールド座標上で、幅5m間隔、奥行き100mの点群を作り、`object_point_list` に格納します
-    - その後、先ほど作成した `ProjectWorld2Image` 関数を呼び、画像上での点に変換します
+    - その後、先ほど作成した `ConvertWorld2Image` 関数を呼び、画像上での点に変換します
     - 最後にその点をOpenCVの `cv::circle` で描画しています
 - `CallbackMouseMain` がマウス操作が発生したときの処理です
     - 「マウスでグリグリさせる」というのは、結局はマウス操作に合わせてカメラの角度を変えることになります
@@ -481,7 +481,7 @@ static void loop_main()
 
     /* Convert to image points (2D) */
     std::vector<cv::Point2f> image_point_list;
-    camera.ProjectWorld2Image(object_point_list, image_point_list);
+    camera.ConvertWorld2Image(object_point_list, image_point_list);
 
     /* Draw the result */
     cv::Mat mat_output = cv::Mat(kHeight, kWidth, CV_8UC3, cv::Scalar(70, 70, 70));
@@ -589,14 +589,14 @@ int main(int argc, char* argv[])
 
 ## OpenCVの機能で投影変換する
 - ここまで頑張って変換式を立てて、実装に落とし込んできましたが、実はOpenCVで用意されています。`cv::projectPoints` という関数です
-- `ProjectWorld2Image` 関数の中身はたった1行で以下のように書き換えられます
+- `ConvertWorld2Image` 関数の中身はたった1行で以下のように書き換えられます
     - ただし、`cv::projectPoints` を使うと、カメラの後方にある点まで表示されてしまうようです
 
 ```cpp:camera_model.h
 class CameraModel {
     略
 
-    void ProjectWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
+    void ConvertWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
     {
         cv::projectPoints(object_point_list, rvec, tvec, K, cv::Mat(), image_point_list);
     }

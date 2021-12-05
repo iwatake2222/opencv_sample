@@ -52,7 +52,6 @@ void InitializeCamera(int32_t width, int32_t height)
     camera_2d_to_3d.SetExtrinsic(
         { 0.0f, 0.0f, 0.0f },    /* rvec [deg] */
         { 0.0f, 0.0f, 0.0f }, true);   /* tvec (Oc - Ow in world coordinate. X+= Right, Y+ = down, Z+ = far) */
-                                       /* tvec must be zero, so that calculated Mc(Location in camera cooridinate) becomes the same as Mw(location in world coordinate), and can be used to convert from 3D to 2D later */
 
     camera_3d_to_2d.SetIntrinsic(kCamera3d2dWidth, kCamera3d2dHeight, FocalLength(kCamera3d2dWidth, kCamera3d2dFovDeg));
     camera_3d_to_2d.SetDist({ 0.0f, 0.0f, 0.0f, 0.0f, 0.0f });
@@ -202,16 +201,16 @@ int main(int argc, char* argv[])
 
     /* Convert px,py,depth(Zc) -> Xc,Yc,Zc(in camera_2d_to_3d)(=Xw,Yw,Zw) */
     std::vector<cv::Point3f> object_point_list;
-    camera_2d_to_3d.ProjectImage2Camera(depth_list, object_point_list);
+    camera_2d_to_3d.ConvertImage2World(depth_list, object_point_list);
 
     while(true) {
         /* Project 3D to 2D(new image) */
         std::vector<cv::Point2f> image_point_list;
-        camera_3d_to_2d.ProjectWorld2Image(object_point_list, image_point_list);
+        camera_3d_to_2d.ConvertWorld2Image(object_point_list, image_point_list);
 
         /* Generate object points in camera coordinate to draw the object in Zc order, from far to near (instead of using Z buffer) */
         std::vector<cv::Point3f> object_point_in_camera_list;
-        camera_3d_to_2d.ProjectWorld2Camera(object_point_list, object_point_in_camera_list);
+        camera_3d_to_2d.ConvertWorld2Camera(object_point_list, object_point_in_camera_list);
 
         /* Argsort by depth (index_0 = Far, index_len-1 = Near)*/
         std::vector<int32_t> indices_depth(object_point_in_camera_list.size());

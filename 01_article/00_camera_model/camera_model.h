@@ -168,7 +168,7 @@ public:
     }
 
     /*** Methods for projection ***/
-    void ProjectWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
+    void ConvertWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
     {
         /* the followings get exactly the same result */
 #if 1

@@ -168,7 +168,7 @@ public:
     }
 
     /*** Methods for projection ***/
-    void ProjectWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
+    void ConvertWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
     {
         /* the followings get exactly the same result */
 #if 1
@@ -210,7 +210,7 @@ public:
 #endif
     }
 
-    void ProjectWorld2Camera(const std::vector<cv::Point3f>& object_point_in_world_list, std::vector<cv::Point3f>& object_point_in_camera_list)
+    void ConvertWorld2Camera(const std::vector<cv::Point3f>& object_point_in_world_list, std::vector<cv::Point3f>& object_point_in_camera_list)
     {
         cv::Mat K = this->K;
         cv::Mat R = MakeRotationMat(Rad2Deg(this->rx()), Rad2Deg(this->ry()), Rad2Deg(this->rz()));
@@ -233,7 +233,7 @@ public:
     }
 
 
-    void ProjectImage2Camera(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
+    void ConvertImage2Camera(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
     {
         if (z_list.size() != this->width * this->height) {
             printf("[ProjectImage2Camera] Invalid z_list size\n");

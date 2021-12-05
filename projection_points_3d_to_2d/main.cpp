@@ -99,7 +99,7 @@ static void loop_main()
 
     /* Convert to image points (2D) */
     std::vector<cv::Point2f> image_point_list;
-    camera.ProjectWorld2Image(object_point_list, image_point_list);
+    camera.ConvertWorld2Image(object_point_list, image_point_list);
 
     /* Draw the result */
     cv::Mat mat_output = cv::Mat(kHeight, kWidth, CV_8UC3, cv::Scalar(70, 70, 70));

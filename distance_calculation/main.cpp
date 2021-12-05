@@ -66,7 +66,7 @@ static void loop_main(const cv::Mat& image_org)
         image = image_org.clone();
 
         std::vector<cv::Point3f> object_point_list;
-        camera.ProjectImage2GroundPlane(selecting_point_list, object_point_list);
+        camera.ConvertImage2GroundPlane(selecting_point_list, object_point_list);
         for (int32_t i = 0; i < selecting_point_list.size(); i++) {
             const auto& image_point = selecting_point_list[i];
             cv::circle(image, image_point, 5, cv::Scalar(255, 0, 0), -1);
@@ -87,7 +87,7 @@ static void loop_main(const cv::Mat& image_org)
 
         /* Re-convert image point to object poitn(world) */
         std::vector<cv::Point3f> object_point_list;
-        camera.ProjectImage2GroundPlane(image_point_list, object_point_list);
+        camera.ConvertImage2GroundPlane(image_point_list, object_point_list);
         for (int32_t i = 0; i < image_point_list.size(); i++) {
             const auto& image_point = image_point_list[i];
             /* Draw calculated imate point */

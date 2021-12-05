@@ -194,8 +194,9 @@ public:
     }
 
     /*** Methods for projection ***/
-    void ProjectWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
+    void ConvertWorld2Image(const std::vector<cv::Point3f>& object_point_list, std::vector<cv::Point2f>& image_point_list)
     {
+        /*** Mw -> Image ***/
         /* the followings get exactly the same result */
 #if 1
         /*** Projection ***/
@@ -255,8 +256,10 @@ public:
 #endif
     }
 
-    void ProjectWorld2Camera(const std::vector<cv::Point3f>& object_point_in_world_list, std::vector<cv::Point3f>& object_point_in_camera_list)
+    void ConvertWorld2Camera(const std::vector<cv::Point3f>& object_point_in_world_list, std::vector<cv::Point3f>& object_point_in_camera_list)
     {
+        /*** Mw -> Mc ***/
+        /* Mc = [R t] * [M, 1] */
         cv::Mat K = this->K;
         cv::Mat R = MakeRotationMat(Rad2Deg(this->rx()), Rad2Deg(this->ry()), Rad2Deg(this->rz()));
         cv::Mat Rt = (cv::Mat_<float>(3, 4) <<
@@ -280,8 +283,38 @@ public:
         }
     }
 
-    void ProjectImage2GroundPlane(const std::vector<cv::Point2f>& image_point_list, std::vector<cv::Point3f>& object_point_list)
+    void ConvertCamera2World(const std::vector<cv::Point3f>& object_point_in_camera_list, std::vector<cv::Point3f>& object_point_in_world_list)
     {
+        /*** Mc -> Mw ***/
+        /* Mc = [R t] * [Mw, 1] */
+        /* -> [M, 1] = [R t]^1 * Mc <- Unable to get the inverse of [R t] because it's 4x3 */
+        /* So, Mc = R * Mw + t */
+        /* -> Mw = R^1 * (Mc - t) */
+        cv::Mat R = MakeRotationMat(Rad2Deg(this->rx()), Rad2Deg(this->ry()), Rad2Deg(this->rz()));
+        cv::Mat R_inv;
+        cv::invert(R, R_inv);
+        cv::Mat t = this->tvec;
+        
+
+        object_point_in_world_list.resize(object_point_in_camera_list.size());
+
+#ifdef _OPENMP
+#pragma omp parallel for
+#endif
+        for (int32_t i = 0; i < object_point_in_camera_list.size(); i++) {
+            const auto& object_point_in_camera = object_point_in_camera_list[i];
+            auto& object_point_in_world = object_point_in_world_list[i];
+            cv::Mat Mc = (cv::Mat_<float>(3, 1) << object_point_in_camera.x, object_point_in_camera.y, object_point_in_camera.z);
+            cv::Mat Mw = R_inv * (Mc - t);
+            object_point_in_world.x = Mw.at<float>(0);
+            object_point_in_world.y = Mw.at<float>(1);
+            object_point_in_world.z = Mw.at<float>(2);
+        }
+    }
+
+    void ConvertImage2GroundPlane(const std::vector<cv::Point2f>& image_point_list, std::vector<cv::Point3f>& object_point_list)
+    {
+        /*** Image -> Mw ***/
         /*** Calculate point in ground plane (in world coordinate) ***/
         /* Main idea:*/
         /*   s * [x, y, 1] = K * [R t] * [M, 1]  */
@@ -343,10 +376,11 @@ public:
         }
     }
 
-    void ProjectImage2Camera(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
+    void ConvertImage2Camera(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
     {
+        /*** Image -> Mc ***/
         if (z_list.size() != this->width * this->height) {
-            printf("[ProjectImage2Camera] Invalid z_list size\n");
+            printf("[ConvertImage2Camera] Invalid z_list size\n");
             return;
         }
 
@@ -372,7 +406,6 @@ public:
 #pragma omp parallel for
 #endif
         for (int32_t i = 0; i < object_point_list.size(); i++) {
-            const auto& image_point = image_point_list[i];
             const auto& Zc = z_list[i];
             auto& object_point = object_point_list[i];
 
@@ -387,6 +420,19 @@ public:
             object_point.y = Yc;
             object_point.z = Zc;
         }
+    }
+
+    void ConvertImage2World(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
+    {
+        /*** Image -> Mw ***/
+        if (z_list.size() != this->width * this->height) {
+            printf("[ConvertImage2Camera] Invalid z_list size\n");
+            return;
+        }
+
+        std::vector<cv::Point3f> object_point_in_camera_list;
+        ConvertImage2Camera(z_list, object_point_in_camera_list);
+        ConvertCamera2World(object_point_in_camera_list, object_point_list);
     }
 
 

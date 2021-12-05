@@ -141,17 +141,17 @@ add_definitions(-DRESOURCE_DIR="${CMAKE_BINARY_DIR}/resource/")
 # 3次元再構築をコードで実装する
 ## カメラモデルの実装
 ### 2D → 3Dへの変換処理
-- 前回作成した、`CameraModel` というクラスに`ProjectImage2Camera` という関数を追加します
+- 前回作成した、`CameraModel` というクラスに`ConvertImage2Camera` という関数を追加します
 - これは、画像座標系での位置(x, y)と奥行きZcを入力として、カメラ座標系での位置(Xc, Yc, Zc)を出力します
 - 入出力はvectorにしています。また、どうせ画像上のすべての点について処理するので、入力引数から(x, y)は削除しています
 
 ```cpp:camera_model.h
 class CameraModel {
     略
-    void ProjectImage2Camera(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
+    void ConvertImage2Camera(const std::vector<float>& z_list, std::vector<cv::Point3f>& object_point_list)
     {
         if (z_list.size() != this->width * this->height) {
-            printf("[ProjectImage2Camera] Invalid z_list size\n");
+            printf("[ConvertImage2Camera] Invalid z_list size\n");
             return;
         }
 
@@ -195,7 +195,7 @@ class CameraModel {
 - `main` 関数の先頭
     - まずは静止画像を読み込み、処理しやすいサイズにリサイズします。そして、入力サイズに合わせてカメラパラメータの設定をしています
     - そのあと、depth mapを推定しています。正規化した結果は`depth_list` に格納されます
-    - そして、先ほど作成した `ProjectImage2Camera` 関数を呼び、入力静止画像の各点(2D)を3D空間の点(Xw, Yw, Zw)に変換し、`object_point_list` として格納しておきます
+    - そして、先ほど作成した `ConvertImage2Camera` 関数を呼び、入力静止画像の各点(2D)を3D空間の点(Xw, Yw, Zw)に変換し、`object_point_list` として格納しておきます
 - `main` 関数のwhileループ内
     - 結果表示用の`camera_3d_to_2d` を用いて、3Dの点を2D上に投影します
     - 投影する際に、単に結果を描画していくと、以下のような問題が発生します
@@ -275,16 +275,16 @@ int main(int argc, char* argv[])
 
     /* Convert px,py,depth(Zc) -> Xc,Yc,Zc(in camera_2d_to_3d)(=Xw,Yw,Zw) */
     std::vector<cv::Point3f> object_point_list;
-    camera_2d_to_3d.ProjectImage2Camera(depth_list, object_point_list);
+    camera_2d_to_3d.ConvertImage2Camera(depth_list, object_point_list);
 
     while (true) {
-        /* Project 3D to 2D(new image) */
+        /* Convert 3D to 2D(new image) */
         std::vector<cv::Point2f> image_point_list;
-        camera_3d_to_2d.ProjectWorld2Image(object_point_list, image_point_list);
+        camera_3d_to_2d.ConvertWorld2Image(object_point_list, image_point_list);
 
         /* Generate object points in camera coordinate to draw the object in Zc order, from far to near (instead of using Z buffer) */
         std::vector<cv::Point3f> object_point_in_camera_list;
-        camera_3d_to_2d.ProjectWorld2Camera(object_point_list, object_point_in_camera_list);
+        camera_3d_to_2d.ConvertWorld2Camera(object_point_list, object_point_in_camera_list);
 
         /* Argsort by depth (index_0 = Far, index_len-1 = Near)*/
         std::vector<int32_t> indices_depth(object_point_in_camera_list.size());
