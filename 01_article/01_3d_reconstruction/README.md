@@ -1,9 +1,10 @@
 # OpenCVとDepth Mapを用いて、3次元再構築する
 
 # この記事について
-- 1枚の静止画像とdepth mapから3次元の点群を生成します。そして、再現された3D空間を自由に動き回ってみます
+- 1枚の静止画像とdepth mapから3次元の点群(Point Cloud)を生成します。そして、再現された3D空間を自由に動き回ってみます
 - ピンホールカメラモデルについて記した、下記の記事を理解している前提で記載します
     - https://github.com/iwatake2222/opencv_sample/tree/master/01_article/00_camera_model
+- おまけに、Open3Dを使った点群生成もしてみます
 
 https://user-images.githubusercontent.com/11009876/144705856-8714558e-610f-4087-a194-11e712517b9f.mp4
 
@@ -317,6 +318,34 @@ int main(int argc, char* argv[])
     return 0;
 }
 ```
+
+
+# Open3Dを使って3次元再構築する
+- ここまで頑張って自分で計算式を立てて実装して来ました。が、実はOpen3Dを使えば元画像とdepth画像から点群(Point Cloud)を作ってくれます
+- 以下の数行のコードで実現できてしまいます。(ここではPythonコードを挙げていますが、c++でも同様のはずです)
+
+```py:点群生成と描画
+import open3d as o3d
+
+image_rgb = o3d.io.read_image("image.png")
+image_depth = o3d.io.read_image("image_depth.png")
+width = int(image_rgb.get_max_bound()[0])
+height = int(image_rgb.get_max_bound()[1])
+camera_intrinsic = o3d.camera.PinholeCameraIntrinsic(width=width, height=height, fx=500, fy=500,cx=width/2, cy=height/2)
+
+image_rgbd = o3d.geometry.RGBDImage.create_from_color_and_depth(image_rgb, image_depth, convert_rgb_to_intensity=False)
+
+pcd = o3d.geometry.PointCloud.create_from_rgbd_image(image_rgbd, camera_intrinsic)
+
+pcd.estimate_normals(search_param=o3d.geometry.KDTreeSearchParamHybrid(radius=0.1, max_nn=30))
+# Flip it, otherwise the pointcloud will be upside down
+pcd.transform([[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, -1, 0], [0, 0, 0, 1]])
+
+o3d.visualization.draw_geometries([pcd], width=640, height=480)
+o3d.io.write_point_cloud("output.ply", pcd)
+```
+
+![image](image/point_cloud_open3d.jpg)
 
 # おわりに
 コンピュータビジョン楽しいよ

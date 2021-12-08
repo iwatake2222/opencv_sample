@@ -588,7 +588,7 @@ int main(int argc, char* argv[])
 ```
 
 ## OpenCVの機能で投影変換する
-- ここまで頑張って変換式を立てて、実装に落とし込んできましたが、実はOpenCVで用意されています。`cv::projectPoints` という関数です
+- ここまで頑張って変換式を立てて、実装に落とし込んできました。が、実はこの機能はOpenCVで用意されています。`cv::projectPoints` という関数です
 - `ConvertWorld2Image` 関数の中身はたった1行で以下のように書き換えられます
     - ただし、`cv::projectPoints` を使うと、カメラの後方にある点まで表示されてしまうようです
 
