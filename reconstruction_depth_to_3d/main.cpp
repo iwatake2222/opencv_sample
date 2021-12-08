@@ -47,6 +47,7 @@ static CameraModel camera_3d_to_2d;
 /*** Function ***/
 static void SaveAsPly(const cv::Mat& image_input, const std::vector<cv::Point3f>& object_point_list, const std::string filename)
 {
+    /* reference: http://www.paulbourke.net/dataformats/ply/ */
     if (image_input.total() != object_point_list.size()) {
         printf("[SaveAsPly] invalid size\n");
         return;
