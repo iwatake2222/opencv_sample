@@ -24,6 +24,7 @@ limitations under the License.
 #include <numeric>
 #include <algorithm>
 #include <chrono>
+#include <fstream> 
 
 #include <opencv2/opencv.hpp>
 
@@ -44,6 +45,32 @@ static CameraModel camera_2d_to_3d;
 static CameraModel camera_3d_to_2d;
 
 /*** Function ***/
+static void SaveAsPly(const cv::Mat& image_input, const std::vector<cv::Point3f>& object_point_list, const std::string filename)
+{
+    if (image_input.total() != object_point_list.size()) {
+        printf("[SaveAsPly] invalid size\n");
+        return;
+    }
+    std::ofstream of;
+    of.open(filename);
+    of << "ply\n" << "format ascii 1.0\n" << "comment author: iwatake2222\n" << "comment object: point cloud by opencv\n";
+    of << "element vertex " << image_input.total() << "\n";
+    of << "property float x\n";
+    of << "property float y\n";
+    of << "property float z\n";
+    of << "property uchar red\n";
+    of << "property uchar green\n";
+    of << "property uchar blue\n";
+    of << "end_header\n";
+    
+    for (int32_t i = 0; i < image_input.total(); i++) {
+        auto& rgb = image_input.at<cv::Vec3b>(i);
+        auto& xyz = object_point_list[i];
+        of << xyz.x << " " << xyz.y << " " << xyz.z << " " << (int32_t)rgb[2] << " " << (int32_t)rgb[1] << " " << (int32_t)rgb[0] << "\n";
+    }
+    of.close();
+}
+
 void InitializeCamera(int32_t width, int32_t height)
 {
     camera_2d_to_3d.SetIntrinsic(width, height, FocalLength(width, kCamera2d3dFovDeg));
@@ -202,6 +229,8 @@ int main(int argc, char* argv[])
     /* Convert px,py,depth(Zc) -> Xc,Yc,Zc(in camera_2d_to_3d)(=Xw,Yw,Zw) */
     std::vector<cv::Point3f> object_point_list;
     camera_2d_to_3d.ConvertImage2World(std::vector<cv::Point2f>(), depth_list, object_point_list);
+
+    SaveAsPly(image_input, object_point_list, "my_point_cloud.ply");
 
     while(true) {
         /* Project 3D to 2D(new image) */

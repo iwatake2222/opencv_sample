@@ -1,0 +1,20 @@
+ply
+format ascii 1.0
+comment author: iwatake2222
+comment object: point cloud by opencv
+element vertex 8
+property float x
+property float y
+property float z
+property uchar red
+property uchar green
+property uchar blue
+end_header
+0 0 0 255 0 0
+0 0 1 255 0 0
+0 1 1 255 0 0
+0 1 0 255 0 0
+1 0 0 0 0 255
+1 0 1 0 0 255
+1 1 1 0 0 255
+1 1 0 0 0 255
