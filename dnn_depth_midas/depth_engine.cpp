@@ -33,7 +33,7 @@ limitations under the License.
 
 /*** Function ***/
 /* reference: https://github.com/opencv/opencv_zoo/blob/dev/models/face_detection_yunet/yunet.py */
-bool DepthEngine::Initialize(const std::string& model_filename)
+bool DepthEngine::Initialize()
 {
     /*  Read Model */
     try {

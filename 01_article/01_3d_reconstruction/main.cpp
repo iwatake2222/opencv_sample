@@ -152,7 +152,7 @@ int main(int argc, char* argv[])
 
     /* Estimate depth */
     DepthEngine depth_engine;
-    depth_engine.Initialize("");
+    depth_engine.Initialize();
     cv::Mat mat_depth;
     depth_engine.Process(image_input, mat_depth);
 

@@ -39,7 +39,7 @@ private:
 public:
     DepthEngine() {}
     ~DepthEngine() {}
-    bool Initialize(const std::string& model_filename);
+    bool Initialize();
     bool Finalize();
     bool Process(const cv::Mat& image_input, cv::Mat& mat_depth);
     bool NormalizeMinMax(const cv::Mat& mat_depth, cv::Mat& mat_depth_normalized);

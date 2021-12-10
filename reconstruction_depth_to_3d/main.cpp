@@ -176,7 +176,7 @@ int main(int argc, char* argv[])
 {
     /* Initialize Model */
     DepthEngine depth_engine;
-    depth_engine.Initialize("");
+    depth_engine.Initialize();
 
     /* Find source image */
     std::string input_name = (argc > 1) ? argv[1] : kInputImageFilename;
